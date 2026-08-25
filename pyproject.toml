@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asl-recognizer"
+version = "0.1.0"
+description = "Signer-independent real-time ASL recognition from landmarks"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "numpy>=2.0,<3",
+  "opencv-python>=4.10,<5",
+  "mediapipe>=1.0,<2",
+  "scikit-learn>=1.6,<2",
+  "torch>=2.7,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.11,<1",
+]
+
+[project.scripts]
+asl-recognizer = "asl_recognizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--strict-markers"
+markers = [
+  "integration: requires optional local assets",
+  "slow: long-running model or dataset test",
+  "hardware: requires a camera or accelerator",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["asl_recognizer"]
+mypy_path = "src"
