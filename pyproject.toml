@@ -5,13 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "asl-recognizer"
 version = "0.1.0"
-description = "Signer-independent real-time ASL recognition from landmarks"
+description = "Recorded ASL-to-English translation from MMPose landmarks"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "numpy>=2.0,<3",
   "opencv-python>=4.10,<5",
-  "mediapipe>=1.0,<2",
-  "scikit-learn>=1.6,<2",
   "torch>=2.7,<3",
 ]
 
@@ -22,9 +20,14 @@ dev = [
   "pytest-cov>=6,<8",
   "ruff>=0.11,<1",
 ]
+hpc = [
+  "transformers>=4.48,<6",
+  "sacrebleu>=2.5,<3",
+  "bleurt-pytorch>=0.0.1,<1",
+]
 
 [project.scripts]
-asl-recognizer = "asl_recognizer.cli:main"
+asl-recognizer = "asl_recognizer.translation.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -51,3 +54,7 @@ python_version = "3.11"
 strict = true
 packages = ["asl_recognizer"]
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["mmpose.*", "mmdet.*", "sacrebleu", "bleurt_pytorch", "gdown"]
+ignore_missing_imports = true

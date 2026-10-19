@@ -1,0 +1,14 @@
+{
+  "feature_schema": "mmpose-coco-wholebody-133-xy-v1",
+  "batch_size": 1,
+  "microbatch_size": 1,
+  "precision": "bf16",
+  "gradient_checkpointing": true,
+  "youtube_steps": 0,
+  "how2sign_steps": 10,
+  "validation_interval": 5,
+  "early_stopping_patience": 4,
+  "checkpoint_interval": 5,
+  "learning_rate": 0.001,
+  "seed": 42
+}

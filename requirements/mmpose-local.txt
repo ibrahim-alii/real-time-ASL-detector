@@ -1,0 +1,9 @@
+# Python 3.11; install Torch and MMCV wheels first (see local guide).
+setuptools==75.8.0
+wheel==0.45.1
+numpy==1.26.4
+opencv-python==4.10.0.84
+mmengine==0.10.7
+mmdet==3.3.0
+mmpose==1.3.2
+scikit-learn==1.5.2

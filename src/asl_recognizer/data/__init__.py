@@ -1,2 +1,0 @@
-"""Dataset indexing and validation."""
-

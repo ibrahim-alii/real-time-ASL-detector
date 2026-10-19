@@ -1,0 +1,160 @@
+"""Operational batch reporting must not mistake an exhausted retry pass for coverage."""
+from __future__ import annotations
+
+import importlib.util
+import sys
+from contextlib import nullcontext
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+import pytest
+
+
+def load_batch():  # type: ignore[no-untyped-def]
+    path = Path(__file__).resolve().parents[1] / 'scripts/sol_youtube_batch.py'
+    spec = importlib.util.spec_from_file_location('sol_youtube_batch', path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_exhausted_failures_are_not_downloaded_coverage() -> None:
+    batch = load_batch()
+    ledger = {'videos': {
+        'one': {'availability': 'available', 'split': 'train'},
+        'two': {'availability': 'unavailable', 'attempts': 3},
+    }}
+    report = batch.coverage(ledger, ['one', 'two'], 3)
+    assert report['pass_exhausted'] is True
+    assert report['all_sources_downloaded'] is False
+    assert report['available'] == 1 and report['exhausted_unavailable'] == 1
+    report = batch.coverage(ledger, ['one', 'two', 'three'], 3)
+    assert report['pending_sources'] == 1 and report['pass_exhausted'] is False
+
+
+def test_only_official_sources_count_toward_completion() -> None:
+    batch = load_batch()
+    ledger = {'videos': {
+        'one': {'availability': 'available', 'split': 'dev'},
+        'extra': {'availability': 'available', 'split': 'train'},
+    }}
+    report = batch.coverage(ledger, ['one'], 3)
+    assert report['all_sources_downloaded'] is True
+    assert report['available'] == 1 and report['available_by_split'] == {'dev': 1}
+
+
+def test_project_headroom_tracks_parallel_download_growth() -> None:
+    batch = load_batch()
+    with patch.object(batch.subprocess, 'run', side_effect=[
+        SimpleNamespace(stdout='100 scratch'), SimpleNamespace(stdout='750 scratch'),
+    ]):
+        assert batch.project_headroom(Path('scratch'), budget=1000) == 900
+        assert batch.project_headroom(Path('scratch'), budget=1000) == 250
+
+
+def test_permanent_and_exhausted_counts_are_disjoint() -> None:
+    batch = load_batch()
+    report = batch.coverage({'videos': {
+        'one': {'availability': 'unavailable', 'attempts': 3,
+                'reason': 'manual-English-captions-unavailable'},
+    }}, ['one'], 3)
+    assert report['permanent_or_invalid_sources'] == 1
+    assert report['exhausted_unavailable'] == 0
+    assert report['pass_exhausted'] is True and report['all_sources_downloaded'] is False
+
+
+@pytest.mark.parametrize('diagnostic', ['HTTP 429', 'Please sign in', 'HTTP 403'])
+def test_authenticated_errors_stop_without_exposing_response(
+    diagnostic: str, tmp_path: Path,
+) -> None:
+    batch = load_batch()
+    batch.COOKIE = tmp_path / 'cookies.txt'
+    batch.COOKIE.write_text('private fixture')
+    response = SimpleNamespace(returncode=1, stdout='', stderr=diagnostic + ' SECRET_VALUE')
+    with (patch.object(batch.subprocess, 'run', return_value=response),
+          pytest.raises(RuntimeError) as error):
+        batch.runner(['python', '-m', 'yt_dlp', 'https://www.youtube.com/watch?v=one'])
+    assert 'SECRET_VALUE' not in str(error.value)
+
+
+def test_cookie_argument_applies_only_to_youtube_commands(tmp_path: Path) -> None:
+    batch = load_batch()
+    batch.COOKIE = tmp_path / 'cookies.txt'
+    batch.COOKIE.write_text('private fixture')
+    response = SimpleNamespace(returncode=0, stdout='{}', stderr='')
+    with patch.object(batch.subprocess, 'run', return_value=response) as call:
+        batch.runner(['python', '-m', 'yt_dlp', 'https://www.youtube.com/watch?v=one'])
+        args = call.call_args.args[0]
+        assert args[-1].startswith('https://www.youtube.com/')
+        copied = Path(args[args.index('--cookies') + 1])
+        assert copied != batch.COOKIE and not copied.exists()
+        batch.runner(['ffprobe', 'video.mp4'])
+        assert '--cookies' not in call.call_args.args[0]
+
+
+def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    batch = load_batch()
+    batch.COOKIE = tmp_path / 'cookies.txt'
+    batch.COOKIE.write_text('private fixture')
+    barrier = Barrier(3)
+    copies: list[Path] = []
+
+    def download(args, **kwargs):  # type: ignore[no-untyped-def]
+        cookie = Path(args[args.index('--cookies') + 1])
+        copies.append(cookie)
+        assert cookie.read_text() == 'private fixture'
+        cookie.write_text('updated worker jar')
+        barrier.wait(timeout=5)
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+    with (patch.object(batch.subprocess, 'run', side_effect=download),
+          ThreadPoolExecutor(max_workers=3) as pool):
+        results = [pool.submit(batch.runner, ['python', '-m', 'yt_dlp', 'source'])
+                   for _ in range(3)]
+        for result in results:
+            result.result()
+    assert len(set(copies)) == 3
+    assert all(not path.exists() for path in copies)
+    assert batch.COOKIE.read_text() == 'private fixture'
+
+
+@pytest.mark.parametrize('previous_status', ['completed', 'failed'])
+def test_large_batch_parameters_and_failed_predecessor_guard(
+    tmp_path, monkeypatch, previous_status
+):  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    run, scratch = tmp_path / 'remote', tmp_path / 'scratch'
+    staging = scratch / 'youtube-asl'
+    staging.mkdir(parents=True)
+    (staging / 'official-ids.txt').write_text('one\ntwo\n')
+    directory = run / 'reports' / 'large-round'
+    monkeypatch.setattr(batch, 'RUN', run)
+    monkeypatch.setattr(batch, 'SCRATCH', scratch)
+    monkeypatch.setattr(batch, 'COOKIE', SimpleNamespace(
+        is_file=lambda: True, stat=lambda: SimpleNamespace(st_mode=0o100600)))
+    monkeypatch.setattr(batch, 'read_json', lambda path: (
+        {'status': previous_status} if path.name == 'previous.json'
+        else {'status': 'completed', 'available': 1}))
+    monkeypatch.setattr(batch.subprocess, 'run', lambda *a, **k: SimpleNamespace(stdout='0'))
+    monkeypatch.setattr(batch.shutil, 'disk_usage', lambda path: SimpleNamespace(free=1024**4))
+    monkeypatch.setattr(batch, 'writer_lock', lambda path: nullcontext())
+    acquire = Mock(return_value={
+        'videos': {'one': {'availability': 'available', 'split': 'train'}}})
+    monkeypatch.setattr(batch, 'acquire_youtube', acquire)
+    monkeypatch.setattr(sys, 'argv', ['batch', 'batch', '--round-dir', str(directory),
+                                    '--workers', '3',
+                                    '--previous-report', str(run / 'previous.json')])
+    if previous_status == 'failed':
+        with pytest.raises(RuntimeError, match='predecessor'):
+            batch.main()
+        acquire.assert_not_called()
+    else:
+        batch.main()
+        assert acquire.call_args.kwargs['video_limit'] == 500
+        assert acquire.call_args.kwargs['byte_limit'] == 256 * 1024**3
+        assert acquire.call_args.kwargs['workers'] == 3

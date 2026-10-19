@@ -1,7 +1,0 @@
-[project]
-dataset_root = "data/raw/asl-citizen"
-artifacts_root = "artifacts"
-seed = 42
-vocabulary_size = 25
-sequence_length = 32
-
