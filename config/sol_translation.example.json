@@ -1,0 +1,28 @@
+{
+  "host": "sol.asu.edu",
+  "user": "your_user",
+  "account": "your_account",
+  "partition": "public",
+  "qos": "public",
+  "gpu": "a100:1",
+  "durable_root": "/home/your_user/asl-translation/run",
+  "scratch_root": "/scratch/your_user/asl-translation",
+  "youtube_limit_bytes": 26843545600,
+  "scratch_limit_bytes": 1099511627776,
+  "home_limit_bytes": 107374182400,
+  "train_limit": 2000,
+  "dev_limit": 100,
+  "how2sign_train_limit": 500,
+  "extraction_shards": 2,
+  "allocation_seconds": 28800,
+  "max_attempts": 3,
+  "seed": 42,
+  "official_ids_url": "https://storage.googleapis.com/gresearch/youtube-asl/youtube_asl_video_ids.txt",
+  "how2sign": {
+    "train_annotations": "https://drive.google.com/file/d/1dUHSoefk9OxKJnHrHPX--I4tpm9QD0ok/view",
+    "dev_annotations": "https://drive.google.com/file/d/1Vpag7VPfdTCCJSao8Pz14rlPfekRMggI/view",
+    "test_annotations": "https://drive.google.com/file/d/1AgwBZW26kFHS4CWNMQTCMPGkBPkH3qCu/view",
+    "train_recordings": "https://drive.google.com/drive/folders/16NGheDRYNdvOxQKV_ty7zOwPjgfvPJQz",
+    "dev_recordings": "https://drive.google.com/file/d/1fCkyuKSsc7gauljuL9sx_jBomf3N6i0g/view"
+  }
+}

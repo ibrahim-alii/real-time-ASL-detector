@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+if [ -x .venv/Scripts/python.exe ]; then
+    exec .venv/Scripts/python.exe scripts/git_safety.py --staged
+elif [ -x .venv/bin/python ]; then
+    exec .venv/bin/python scripts/git_safety.py --staged
+else
+    exec python scripts/git_safety.py --staged
+fi

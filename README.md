@@ -75,4 +75,25 @@ dataset, feature, and preprocessing contracts before inference.
   them. Raspberry Pi deployment should begin with a 64-bit Python environment, CPU PyTorch, a
   supported camera backend, and a benchmark of the unchanged bundle before optimization.
 
-Implementation details and remaining gates are recorded in `docs/stages/`.
+Detailed plans, PRD, deployment notes and reports remain local and are excluded from
+Git. README is the public documentation; the MIT license is preserved in LICENSE.
+
+## On-demand commits
+
+Enable the versioned commit/push guards once per checkout:
+
+```powershell
+git config --local core.hooksPath .githooks
+```
+
+After a coherent change, run relevant tests plus Ruff/type checks, stage explicit
+reviewed paths, and inspect `git diff --cached --stat` and `git diff --cached`.
+The pre-commit hook checks actual staged blobs; the pre-push hook checks outgoing
+commit trees and blocks internal Codex refs. Both reject local docs (except root
+README), credentials, personal Sol config, datasets, weights and generated files.
+Never bypass these checks or use `git add .` for an unreviewed working tree.
+Commit messages should describe the result, for example:
+`fix(acquisition): preserve verified pairs after interrupted downloads`.
+Use separate commits for independent changes. Pushing is a separate user action;
+no scheduled task or background push is configured. Hooks must be enabled in each
+clone, and pattern checks do not prove that every possible secret is absent.

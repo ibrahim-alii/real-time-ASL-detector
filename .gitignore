@@ -1,8 +1,7 @@
-# Project documentation and planning
-/docs/
-*.md
-!README.md
-!LICENSE.md
+# Project-local agent instructions and obsolete planning
+*.mdc
+AGENTS.md
+PLANS.md
 
 # Python bytecode and caches
 __pycache__/
@@ -15,10 +14,13 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv-mmpose/
 venv/
 env/
 
 # Test and coverage output
+.test-tmp-*/
+.codex-test-temp/
 .coverage
 .coverage.*
 htmlcov/
@@ -34,6 +36,8 @@ dist/
 .env
 .env.*
 !.env.example
+.asl-sol-access/
+/youtube-sol-cookies.txt
 
 # Editors and operating systems
 .idea/
@@ -49,8 +53,63 @@ Thumbs.db
 *.pth
 *.npz
 *.onnx
+*.gguf
+*.safetensors
+
+# Locally built llama.cpp runtimes
+/llama.cpp/
+/models/llama.cpp/
+llama-server.exe
+llama-cli.exe
 
 # Logs and temporary files
 *.log
 *.tmp
 *.swp
+
+docs/
+/plans/
+/reports/
+/notes/
+
+# Local documentation stays on this workstation; README is the public guide.
+*.md
+*.markdown
+*.rst
+*.pdf
+*.docx
+*.pptx
+!/README.md
+
+# Machine/cluster credentials and personalized configuration
+.codex/
+.agents/
+.aws/
+.ssh/
+.githooks-local/
+config/sol_translation.json
+*cookies*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*
+secrets*
+
+# Raw media, archives, arrays and compiled runtimes
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.npy
+*.ckpt
+*.bin
+*.exe
+*.dll
+*.pyd
