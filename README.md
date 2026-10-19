@@ -1,99 +1,32 @@
-# Real-Time ASL Recognizer
+# ASL to English
 
-Laptop-first MVP for signer-independent isolated-sign training and stabilized webcam recognition
-using MediaPipe hand/pose landmarks and a compact GRU.
+## Final solution
 
-## Architecture
+- Collect verified ASL video and English text pairs from YouTube-ASL and realigned How2Sign.
+- Extract hand, face and body landmarks with MMPose: 133 points and 266 xy values per frame.
+- Use a learned projection and pretrained T5.1.1-base to translate landmark sequences into English.
+- Train on filtered YouTube-ASL, fine-tune on How2Sign, and evaluate recorded-video translations.
+- Measure translation quality with BLEU and human meaning review, including questions, negation and failures.
 
-```text
-ASL Citizen CSV/video -> validated signer splits -> normalized landmark cache
-                     -> baselines + GRU -> validated model bundle
-Camera -> MediaPipe -> rolling buffer -> GRU -> activity/confidence gates -> display
-```
+## Where we are — October 19, 2026
 
-Raw videos, extracted features, and model artifacts stay local and are ignored by Git.
+- [x] Implemented data import, frozen snapshots, source-overlap checks and verified recording staging.
+- [x] Implemented MMPose extraction, missing-point masks and identity-checked feature caches.
+- [x] Implemented configurable T5 training, dev validation, checkpoints, resume and recorded-clip inference.
+- [x] Implemented person filtering, review queues and resource estimates.
+- [x] Saved pilot receipts confirm 32 How2Sign train and 8 dev examples selected and 40 full recordings staged.
+- [x] Pilot extraction retry submitted after a source-video decode failure; completion and visual review remain unverified.
+- [ ] Complete real paired-data training; the saved receipts still mark training and semantic review pending.
+- [ ] Establish useful translation quality; implementation tests do not demonstrate ASL accuracy.
 
-## Setup
+## What we need to accomplish
 
-Python 3.11-3.13 is supported.
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python -m pytest -q
-```
-
-Download ASL Citizen v1.0 and its official split CSVs from Microsoft Research. Also acquire a
-MediaPipe Holistic Task model and calculate its SHA-256 with `Get-FileHash`. Do not commit either
-asset. The CLI requires the expected hash so an accidental model replacement cannot silently alter
-features.
-
-## Pipeline
-
-```powershell
-asl-recognizer data-index `
-  --train-csv data/raw/asl-citizen/train.csv `
-  --val-csv data/raw/asl-citizen/val.csv `
-  --test-csv data/raw/asl-citizen/test.csv `
-  --video-root data/raw/asl-citizen/videos `
-  --output-dir artifacts/index
-
-asl-recognizer extract `
-  --manifest artifacts/index/manifest.csv `
-  --vocabulary artifacts/index/vocabulary.json `
-  --video-root data/raw/asl-citizen/videos `
-  --cache-root artifacts/features `
-  --holistic-model models/holistic_landmarker.task `
-  --holistic-model-sha256 <SHA256>
-
-asl-recognizer train `
-  --manifest artifacts/index/manifest.csv `
-  --vocabulary artifacts/index/vocabulary.json `
-  --video-root data/raw/asl-citizen/videos `
-  --cache-root artifacts/features `
-  --output-dir artifacts/training
-
-asl-recognizer demo `
-  --bundle artifacts/training/model.pt `
-  --vocabulary artifacts/index/vocabulary.json `
-  --holistic-model models/holistic_landmarker.task `
-  --holistic-model-sha256 <SHA256> `
-  --report artifacts/webcam-benchmark.json
-```
-
-Press Space to start or stop recognition and Escape to exit. The demo validates the label,
-dataset, feature, and preprocessing contracts before inference.
-
-## Current Limits
-
-- The repository does not include ASL Citizen, a Holistic model asset, or trained weights.
-- Continuous thresholds need calibration on separate recorded streams before accuracy claims.
-- No learned background class is available from the isolated-sign dataset; the MVP uses hand,
-  motion, confidence, hysteresis, and cooldown gates for the no-sign state.
-- Transformer, personalization, ONNX, and quantization are deferred until GRU measurements justify
-  them. Raspberry Pi deployment should begin with a 64-bit Python environment, CPU PyTorch, a
-  supported camera backend, and a benchmark of the unchanged bundle before optimization.
-
-Detailed plans, PRD, deployment notes and reports remain local and are excluded from
-Git. README is the public documentation; the MIT license is preserved in LICENSE.
-
-## On-demand commits
-
-Enable the versioned commit/push guards once per checkout:
-
-```powershell
-git config --local core.hooksPath .githooks
-```
-
-After a coherent change, run relevant tests plus Ruff/type checks, stage explicit
-reviewed paths, and inspect `git diff --cached --stat` and `git diff --cached`.
-The pre-commit hook checks actual staged blobs; the pre-push hook checks outgoing
-commit trees and blocks internal Codex refs. Both reject local docs (except root
-README), credentials, personal Sol config, datasets, weights and generated files.
-Never bypass these checks or use `git add .` for an unreviewed working tree.
-Commit messages should describe the result, for example:
-`fix(acquisition): preserve verified pairs after interrupted downloads`.
-Use separate commits for independent changes. Pushing is a separate user action;
-no scheduled task or background push is configured. Hooks must be enabled in each
-clone, and pattern checks do not prove that every possible secret is absent.
+- [ ] Inspect pose overlays, signer selection and caption alignment on representative recordings.
+- [ ] Verify extraction completion, compatible caches and all requested example counts.
+- [ ] Run the ten-update How2Sign smoke and verify uninterrupted versus 5+5 resumed training.
+- [ ] Run a short YouTube-ASL → How2Sign training pilot and save initial/latest/best checkpoints.
+- [ ] Review dev predictions, BLEU, meaning preservation, failures and shuffled-input controls.
+- [ ] Measure usable signing hours, source/signer diversity, training time, GPU memory and storage.
+- [ ] Expand data and training only after review and resource checks pass.
+- [ ] Define measurable quality targets from the dev baseline before final test evaluation.
+- [ ] Finalize the chosen model, evaluate held-out test clips and report results and limitations.
