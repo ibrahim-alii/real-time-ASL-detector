@@ -126,6 +126,7 @@ def acquisition_failure_kind(reason: str) -> str:
         return "invalid_data"
     if any(word in reason for word in (
         "429", "too many requests", "sign in", "confirm you", "cookies", "403",
+        "throttling/authentication requires investigation",
     )):
         return "access_blocked"
     return "retryable"
