@@ -72,17 +72,38 @@ def runner(args: list[str], **kwargs: object) -> str:
         result = subprocess.run(args, capture_output=True, text=True, timeout=600, check=False)
     if result.returncode:
         diagnostic = result.stderr.lower()
+        flags = {
+            'http429': '429' in diagnostic or 'too many requests' in diagnostic,
+            'http403': '403' in diagnostic,
+            'cookie_invalid': 'cookies are no longer valid' in diagnostic,
+            'sign_in': 'sign in' in diagnostic,
+            'confirm_you': 'confirm you' in diagnostic,
+            'private_video': 'private video' in diagnostic,
+            'age_required': 'confirm your age' in diagnostic,
+            'human_verification': 'not a bot' in diagnostic,
+        }
+
+        def failure(message: str) -> RuntimeError:
+            # Persist only known boolean markers, never raw downloader credentials/URLs.
+            return RuntimeError(message + '; diagnostic_flags=' + json.dumps(flags))
+
         if '429' in diagnostic or 'too many requests' in diagnostic:
-            raise RuntimeError('429 YouTube rate limit; stop authenticated acquisition')
+            raise failure('429 YouTube rate limit; stop authenticated acquisition')
+        if flags['cookie_invalid']:
+            raise failure('sign in / cookies rejected; stop authenticated acquisition')
+        if flags['private_video'] and not (
+            flags['http403'] or flags['age_required'] or flags['human_verification']
+        ):
+            raise failure('source unavailable')
         if any(word in diagnostic for word in (
             'sign in', 'cookies are no longer valid', 'confirm you',
         )):
-            raise RuntimeError('sign in / cookies rejected; stop authenticated acquisition')
+            raise failure('sign in / cookies rejected; stop authenticated acquisition')
         if '403' in diagnostic:
-            raise RuntimeError('403 YouTube access denied; stop authenticated acquisition')
+            raise failure('403 YouTube access denied; stop authenticated acquisition')
         if 'unavailable' in diagnostic or 'private video' in diagnostic:
-            raise RuntimeError('source unavailable')
-        raise RuntimeError(f'downloader or video probe failed (exit {result.returncode})')
+            raise failure('source unavailable')
+        raise failure(f'downloader or video probe failed (exit {result.returncode})')
     return result.stdout
 
 
