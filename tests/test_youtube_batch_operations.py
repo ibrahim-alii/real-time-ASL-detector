@@ -55,6 +55,33 @@ def test_project_headroom_tracks_parallel_download_growth() -> None:
         assert batch.project_headroom(Path('scratch'), budget=1000) == 250
 
 
+def test_headroom_retries_disappearing_entries_without_using_partial_size() -> None:
+    batch = load_batch()
+    missing = batch.subprocess.CalledProcessError(
+        1, ['du'], output='100 scratch', stderr='du: temporary: No such file or directory',
+    )
+    with patch.object(batch.subprocess, 'run', side_effect=[
+        missing, SimpleNamespace(stdout='750 scratch'),
+    ]) as run:
+        assert batch.project_headroom(Path('scratch'), budget=1000) == 250
+    assert run.call_count == 2
+
+
+@pytest.mark.parametrize(('diagnostic', 'attempts'), [
+    ('No such file or directory', 3), ('Permission denied', 1),
+    ('No such file or directory\nPermission denied', 1), ('', 1),
+])
+def test_headroom_stops_after_bounded_or_nontransient_scan_failure(
+    diagnostic: str, attempts: int,
+) -> None:
+    batch = load_batch()
+    error = batch.subprocess.CalledProcessError(1, ['du'], output='1 scratch', stderr=diagnostic)
+    with (patch.object(batch.subprocess, 'run', side_effect=error) as run,
+          pytest.raises(batch.subprocess.CalledProcessError)):
+        batch.project_headroom(Path('scratch'), budget=1000)
+    assert run.call_count == attempts
+
+
 def test_permanent_and_exhausted_counts_are_disjoint() -> None:
     batch = load_batch()
     report = batch.coverage({'videos': {
