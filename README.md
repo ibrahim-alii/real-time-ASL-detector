@@ -20,7 +20,7 @@
 - [x] Completed 32 YouTube updates followed by 16 How2Sign updates, checkpoints, dev controls and recorded inference.
 - [x] Scored the pilot with BLEU and BLEURT; selected BLEURT fell below initial scores on both corpora, and YouTube shuffled inputs scored higher than real inputs.
 - [ ] Establish useful translation quality; the small engineering pilot does not demonstrate useful ASL translation.
-- [ ] Reconcile fresh-cookie YouTube recovery job 66156129; submission is recorded, but its outcome is unverified locally and current Sol SSH checks timed out.
+- [x] Restored Sol access and verified fresh-cookie acquisition: the three-worker check added 6 video/caption pairs, bringing saved coverage to 654 pairs.
 
 ## What we need to accomplish
 
