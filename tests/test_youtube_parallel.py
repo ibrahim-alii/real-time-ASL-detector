@@ -119,6 +119,41 @@ def test_reservations_are_aggregate_and_released(tmp_path):  # type: ignore[no-u
     assert reservations.reserve(500, False) == 650
 
 
+@pytest.mark.parametrize("approximate_size", [100, 10000000])
+@pytest.mark.parametrize("headroom", [100000, 100000000])
+def test_approximate_sizes_reserve_conservatively_before_download(
+    tmp_path, monkeypatch, approximate_size, headroom,
+):  # type: ignore[no-untyped-def]
+    _root, kwargs, original = fixture(tmp_path, monkeypatch)
+    downloads = []
+
+    def runner(args: list[str]) -> str:
+        if "--dump-single-json" in args:
+            info = json.loads(original(args))
+            info["duration"] = 2
+            selected = info["formats"][0]
+            selected.pop("filesize")
+            selected.update(filesize_approx=approximate_size, tbr=0.4)
+            return json.dumps(info)
+        if "-f" in args:
+            downloads.append(args)
+            allocation = int(args[args.index("--max-filesize") + 1])
+            assert allocation >= max(500, approximate_size)
+            Path(args[args.index("-o") + 1]).write_bytes(b"x" * 500)
+            return ""
+        return original(args)
+
+    kwargs.update(byte_limit=100000000, scratch_remaining=lambda: headroom, video_limit=1)
+    if headroom == 100000:
+        with pytest.raises(ValueError, match="insufficient capacity"):
+            acquisition.acquire_youtube(**kwargs, runner=runner)
+        assert not downloads
+    else:
+        ledger = acquisition.acquire_youtube(**kwargs, runner=runner)
+        assert len(downloads) == 1
+        assert all(row["availability"] == "available" for row in ledger["videos"].values())
+
+
 def test_unexpected_worker_failure_commits_other_completed_sources(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
     root, kwargs, runner = fixture(tmp_path, monkeypatch)
     original = acquisition._acquire_youtube_source
