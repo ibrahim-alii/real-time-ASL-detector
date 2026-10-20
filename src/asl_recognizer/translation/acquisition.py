@@ -113,7 +113,7 @@ def fetch_ids(url: str, output: Path) -> None:
 
 def acquisition_failure_kind(reason: str) -> str:
     """Avoid repeatedly requesting sources that cannot supply the required paired data."""
-    reason = reason.lower()
+    reason = reason.lower().split("; diagnostic_flags=", 1)[0]
     if any(word in reason for word in (
         "manual-english-captions-unavailable", "source unavailable", "video is unavailable",
         "private video", "video has been removed", "video has been deleted",
