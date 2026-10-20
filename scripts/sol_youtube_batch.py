@@ -74,7 +74,9 @@ def runner(args: list[str], **kwargs: object) -> str:
         diagnostic = result.stderr.lower()
         if '429' in diagnostic or 'too many requests' in diagnostic:
             raise RuntimeError('429 YouTube rate limit; stop authenticated acquisition')
-        if any(word in diagnostic for word in ('sign in', 'cookies', 'confirm you')):
+        if any(word in diagnostic for word in (
+            'sign in', 'cookies are no longer valid', 'confirm you',
+        )):
             raise RuntimeError('sign in / cookies rejected; stop authenticated acquisition')
         if '403' in diagnostic:
             raise RuntimeError('403 YouTube access denied; stop authenticated acquisition')
