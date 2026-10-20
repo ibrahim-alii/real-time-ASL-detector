@@ -27,8 +27,18 @@ ROUND = RUN / 'reports/youtube-probe'
 
 def project_headroom(scratch: Path, budget: int = 1024**4) -> int:
     """Recheck space consumed by this batch and parallel corpus downloads."""
-    usage = subprocess.run(['du', '-sb', str(scratch)], capture_output=True,
-                           text=True, check=True, timeout=120)
+    for attempt in range(3):
+        try:
+            usage = subprocess.run(['du', '-sb', str(scratch)], capture_output=True,
+                                   text=True, check=True, timeout=120)
+            break
+        except subprocess.CalledProcessError as error:
+            # Concurrent writers can remove temporary entries during a tree scan.
+            lines = (error.stderr or '').splitlines()
+            if attempt == 2 or not lines or any(
+                'No such file or directory' not in line for line in lines
+            ):
+                raise
     return max(0, budget - int(usage.stdout.split()[0]))
 
 
