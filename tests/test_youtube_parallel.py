@@ -11,6 +11,22 @@ from asl_recognizer.translation import acquisition
 from asl_recognizer.translation.sol_common import read_json, write_json
 
 
+@pytest.mark.parametrize(('message', 'expected'), [
+    ('downloader or video probe failed (exit 1)', 'retryable'),
+    ('source unavailable', 'permanent_unavailable'),
+    ('caption boundaries exceed video duration', 'invalid_data'),
+    ('403 YouTube access denied', 'access_blocked'),
+    ('sign in / cookies rejected', 'access_blocked'),
+])
+def test_diagnostic_field_names_do_not_change_failure_category(
+    message: str, expected: str,
+) -> None:
+    flags = {'http429': False, 'http403': False, 'cookie_invalid': False,
+             'sign_in': False, 'confirm_you': False}
+    reason = message + '; diagnostic_flags=' + json.dumps(flags)
+    assert acquisition.acquisition_failure_kind(reason) == expected
+
+
 def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     root = tmp_path / "youtube"
     root.mkdir()
