@@ -212,9 +212,13 @@ def _acquire_youtube_source(
         formats = video_only or formats
         selected = max(formats, key=lambda f: (f.get("height") or 0, f.get("tbr") or 0))
         remove_audio = selected.get("acodec") != "none"
-        estimated = selected.get("filesize") or selected.get("filesize_approx")
+        estimated = selected.get("filesize")
         if not estimated:
-            estimated = (selected.get("tbr") or 10000) * 1000 / 8 * info.get("duration", 0)
+            # Approximate sizes/bitrates can understate muxed files severalfold.
+            estimated = max(
+                selected.get("filesize_approx") or 0,
+                max(selected.get("tbr") or 0, 10000) * 1000 / 8 * info.get("duration", 0),
+            )
         if estimated <= 0:
             raise ValueError("video size cannot be estimated")
         allocation = reservations.reserve(int(estimated), remove_audio)
