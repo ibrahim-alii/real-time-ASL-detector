@@ -96,8 +96,9 @@ def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkey
         return original(args)
 
     monkeypatch.setattr(acquisition, "_save_youtube_acquisition", writer)
-    with pytest.raises(RuntimeError, match="investigation"):
+    with pytest.raises(RuntimeError, match="investigation") as failure:
         acquisition.acquire_youtube(**kwargs, runner=runner)
+    assert acquisition.acquisition_failure_kind(str(failure.value)) == "access_blocked"
     ledger = read_json(root / "acquisition.json")
     assert len(metadata) == 2
     # Metadata-only cancellation refunds the source attempt completely.
