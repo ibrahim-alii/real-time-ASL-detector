@@ -95,6 +95,32 @@ def test_cookie_argument_applies_only_to_youtube_commands(tmp_path: Path) -> Non
         assert '--cookies' not in call.call_args.args[0]
 
 
+@pytest.mark.parametrize(('diagnostic', 'expected', 'flag'), [
+    ('Private video. Sign in if granted access', 'source unavailable', 'private_video'),
+    ('HTTP 403; cookies FAQ', '403 YouTube access denied', 'http403'),
+    ('Private video; cookies are no longer valid', 'sign in / cookies rejected', 'cookie_invalid'),
+    ('Sign in to confirm your age', 'sign in / cookies rejected', 'age_required'),
+    ('Sign in to confirm you are not a bot', 'sign in / cookies rejected', 'human_verification'),
+    ('HTTP 429; Private video', '429 YouTube rate limit', 'http429'),
+    ('HTTP 403; Private video', '403 YouTube access denied', 'http403'),
+])
+def test_failure_flags_distinguish_source_and_session_without_raw_response(
+    diagnostic: str, expected: str, flag: str, tmp_path: Path,
+) -> None:
+    batch = load_batch()
+    batch.COOKIE = tmp_path / 'cookies.txt'
+    batch.COOKIE.write_text('synthetic')
+    response = SimpleNamespace(returncode=1, stdout='', stderr=diagnostic + ' SECRET_VALUE')
+    with (patch.object(batch.subprocess, 'run', return_value=response),
+          pytest.raises(RuntimeError, match=expected) as error):
+        batch.runner(['python', '-m', 'yt_dlp', 'synthetic-source'])
+    detail = str(error.value)
+    assert 'SECRET_VALUE' not in detail
+    flags = json.loads(detail.split('; diagnostic_flags=', 1)[1])
+    assert flags[flag] is True
+    assert all(type(value) is bool for value in flags.values())
+
+
 @pytest.mark.parametrize(('diagnostic', 'expected'), [
     ('HTTP Error 403; see FAQ#how-do-i-pass-cookies', '403 YouTube access denied'),
     ('Video unavailable; see FAQ#how-do-i-pass-cookies', 'source unavailable'),
