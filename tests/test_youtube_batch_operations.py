@@ -95,6 +95,26 @@ def test_cookie_argument_applies_only_to_youtube_commands(tmp_path: Path) -> Non
         assert '--cookies' not in call.call_args.args[0]
 
 
+@pytest.mark.parametrize(('diagnostic', 'expected'), [
+    ('HTTP Error 403; see FAQ#how-do-i-pass-cookies', '403 YouTube access denied'),
+    ('Video unavailable; see FAQ#how-do-i-pass-cookies', 'source unavailable'),
+    ('WARNING: cookies are no longer valid', 'sign in / cookies rejected'),
+    ('Sign in to confirm your age; see cookies FAQ', 'sign in / cookies rejected'),
+    ('HTTP Error 429; see cookies FAQ', '429 YouTube rate limit'),
+])
+def test_cookie_help_link_does_not_override_actual_failure(
+    diagnostic: str, expected: str, tmp_path: Path,
+) -> None:
+    batch = load_batch()
+    batch.COOKIE = tmp_path / 'cookies.txt'
+    batch.COOKIE.write_text('private fixture')
+    response = SimpleNamespace(returncode=1, stdout='', stderr=diagnostic + ' SECRET_VALUE')
+    with (patch.object(batch.subprocess, 'run', return_value=response),
+          pytest.raises(RuntimeError, match=expected) as failure):
+        batch.runner(['python', '-m', 'yt_dlp', 'source'])
+    assert 'SECRET_VALUE' not in str(failure.value)
+
+
 def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path) -> None:
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
