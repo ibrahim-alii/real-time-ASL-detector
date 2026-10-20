@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from contextlib import nullcontext
 from pathlib import Path
@@ -144,7 +145,7 @@ def test_large_batch_parameters_and_failed_predecessor_guard(
     monkeypatch.setattr(batch.shutil, 'disk_usage', lambda path: SimpleNamespace(free=1024**4))
     monkeypatch.setattr(batch, 'writer_lock', lambda path: nullcontext())
     acquire = Mock(return_value={
-        'videos': {'one': {'availability': 'available', 'split': 'train'}}})
+        'videos': {'one': {'availability': 'available', 'split': 'train', 'attempts': 1}}})
     monkeypatch.setattr(batch, 'acquire_youtube', acquire)
     monkeypatch.setattr(sys, 'argv', ['batch', 'batch', '--round-dir', str(directory),
                                     '--workers', '3',
@@ -158,3 +159,72 @@ def test_large_batch_parameters_and_failed_predecessor_guard(
         assert acquire.call_args.kwargs['video_limit'] == 500
         assert acquire.call_args.kwargs['byte_limit'] == 256 * 1024**3
         assert acquire.call_args.kwargs['workers'] == 3
+        report = json.loads((directory / 'batch-report.json').read_text())
+        assert report['batch_progress']['acquired_pairs'] == 1
+
+
+def test_batch_progress_excludes_cached_and_cancelled_sources() -> None:
+    batch = load_batch()
+    cached = {'availability': 'available', 'attempts': 1, 'files': [{'bytes': 1000}]}
+    before = {'videos': {'cached': cached}}
+    after = {'videos': {
+        'cached': cached,
+        'new': {'availability': 'available', 'attempts': 1, 'files': [{'bytes': 200}]},
+        'blocked': {'availability': 'unavailable', 'attempts': 1, 'reason': 'HTTP 403'},
+        'no-caption': {'availability': 'unavailable', 'attempts': 1,
+                       'reason': 'manual-English-captions-unavailable'},
+    }}
+    report = batch.batch_progress(before, after, 120)
+    assert report == {
+        'attempted_sources': 3, 'acquired_pairs': 1, 'paired_artifact_bytes': 200,
+        'failure_categories': {'access_blocked': 1, 'permanent_unavailable': 1},
+        'seconds': 120, 'pairs_per_hour': 30,
+    }
+    assert batch.batch_progress(before, before, 0)['pairs_per_hour'] is None
+
+
+def test_batch_progress_counts_successful_retry_and_repair() -> None:
+    batch = load_batch()
+    before = {'videos': {
+        'retry': {'availability': 'unavailable', 'attempts': 1},
+        'repair': {'availability': 'available', 'attempts': 1},
+    }}
+    after = {'videos': {key: {'availability': 'available', 'attempts': 2}
+                        for key in before['videos']}}
+    assert batch.batch_progress(before, after, 3600)['acquired_pairs'] == 2
+
+
+def test_failed_batch_reports_persisted_partial_progress(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    run, scratch = tmp_path / 'run', tmp_path / 'scratch'
+    staging = scratch / 'youtube-asl'
+    staging.mkdir(parents=True)
+    (staging / 'official-ids.txt').write_text('one\ntwo\n')
+    directory = run / 'reports' / 'failed-round'
+    probe = tmp_path / 'probe.json'
+    probe.write_text(json.dumps({'status': 'completed', 'available': 1}))
+    monkeypatch.setattr(batch, 'RUN', run)
+    monkeypatch.setattr(batch, 'SCRATCH', scratch)
+    monkeypatch.setattr(batch, 'COOKIE', SimpleNamespace(
+        is_file=lambda: True, stat=lambda: SimpleNamespace(st_mode=0o100600)))
+    monkeypatch.setattr(batch.subprocess, 'run', lambda *a, **k: SimpleNamespace(stdout='0'))
+    monkeypatch.setattr(batch.shutil, 'disk_usage', lambda path: SimpleNamespace(free=1024**4))
+    monkeypatch.setattr(batch, 'writer_lock', lambda path: nullcontext())
+
+    def fail(**kwargs):  # type: ignore[no-untyped-def]
+        batch.write_json(staging / 'acquisition.json', {'videos': {
+            'one': {'availability': 'available', 'attempts': 1},
+            'two': {'availability': 'unavailable', 'attempts': 1, 'reason': 'HTTP 429'},
+        }})
+        raise RuntimeError('authentication requires investigation')
+
+    monkeypatch.setattr(batch, 'acquire_youtube', fail)
+    monkeypatch.setattr(sys, 'argv', ['batch', 'batch', '--round-dir', str(directory),
+                                    '--probe-report', str(probe)])
+    with pytest.raises(RuntimeError, match='investigation'):
+        batch.main()
+    report = json.loads((directory / 'batch-report.json').read_text())
+    assert report['status'] == 'failed'
+    assert report['batch_progress']['attempted_sources'] == 2
+    assert report['batch_progress']['acquired_pairs'] == 1
+    assert report['batch_progress']['failure_categories'] == {'access_blocked': 1}

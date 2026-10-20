@@ -14,17 +14,20 @@
 - [x] Implemented MMPose extraction, missing-point masks and identity-checked feature caches.
 - [x] Implemented configurable T5 training, dev validation, checkpoints, resume and recorded-clip inference.
 - [x] Implemented person filtering, review queues and resource estimates.
-- [x] Saved pilot receipts confirm 32 How2Sign train and 8 dev examples selected and 40 full recordings staged.
-- [x] Pilot extraction retry submitted after a source-video decode failure; completion and visual review remain unverified.
-- [ ] Complete real paired-data training; the saved receipts still mark training and semantic review pending.
-- [ ] Establish useful translation quality; implementation tests do not demonstrate ASL accuracy.
+- [x] Saved acquisition audit covers all 2,212 train, 132 dev and 184 test How2Sign recordings; usable clip quality remains separate.
+- [x] Extracted pilot features for 54 train / 9 dev YouTube clips and 32 train / 8 dev How2Sign clips.
+- [x] Passed real ten-update versus 5+5 resumed training equivalence checks.
+- [x] Completed 32 YouTube updates followed by 16 How2Sign updates, checkpoints, dev controls and recorded inference.
+- [x] Scored the pilot with BLEU and BLEURT; selected BLEURT fell below initial scores on both corpora, and YouTube shuffled inputs scored higher than real inputs.
+- [ ] Establish useful translation quality; the small engineering pilot does not demonstrate useful ASL translation.
+- [ ] Reconcile fresh-cookie YouTube recovery job 66156129; submission is recorded, but its outcome is unverified locally and current Sol SSH checks timed out.
 
 ## What we need to accomplish
 
 - [ ] Inspect pose overlays, signer selection and caption alignment on representative recordings.
 - [ ] Verify extraction completion, compatible caches and all requested example counts.
-- [ ] Run the ten-update How2Sign smoke and verify uninterrupted versus 5+5 resumed training.
-- [ ] Run a short YouTube-ASL → How2Sign training pilot and save initial/latest/best checkpoints.
+- [ ] Diagnose learning on a small reviewed training set before increasing training scale.
+- [ ] Measure each download batch's newly acquired pairs, failure categories and useful pairs per hour before increasing concurrency.
 - [ ] Review dev predictions, BLEU, meaning preservation, failures and shuffled-input controls.
 - [ ] Measure usable signing hours, source/signer diversity, training time, GPU memory and storage.
 - [ ] Expand data and training only after review and resource checks pass.

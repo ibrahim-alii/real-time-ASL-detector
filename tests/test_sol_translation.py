@@ -65,6 +65,54 @@ def test_benchmark_budgets_slower_corpus_and_measured_checkpoint(tmp_path, monke
     assert len(read_json(pipeline.reports / "benchmark.json")["candidates"]) == 4
 
 
+def test_benchmark_selects_fastest_safe_microbatch_not_largest(tmp_path, monkeypatch):
+    from asl_recognizer.translation import sol_training
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "is_bf16_supported", lambda **_kw: True)
+    monkeypatch.setattr(torch.cuda, "get_device_properties",
+                        lambda _i: SimpleNamespace(total_memory=1000))
+    monkeypatch.setattr(sol_training, "collect", lambda: None)
+
+    def run(**kwargs):
+        size = kwargs["config"].microbatch_size
+        seconds = {1: 2.0, 2: 0.5, 4: 3.0, 8: 1.0}[size]
+        write_json(kwargs["output"] / "progress.json", {
+            "source_timings": {corpus: {
+                "optimizer_seconds": seconds * 25, "optimizer_updates": 25,
+                "validation_seconds_max": 1,
+            } for corpus in ("youtube-asl", "how2sign")},
+            "checkpoint_seconds_max": 1,
+            "peak_vram_bytes": 800 if size == 2 else 500,
+        })
+
+    monkeypatch.setattr(sol_training, "run_experiment", run)
+    pipeline = SimpleNamespace(
+        scratch=tmp_path / "scratch", root=tmp_path / "home",
+        reports=tmp_path / "home/reports", features=tmp_path / "features",
+        manifests=tmp_path / "manifests", config={"allocation_seconds": 1000},
+    )
+    sol_training.benchmark(pipeline)
+    budget = read_json(pipeline.reports / "training-budget.json")
+    # Size 2 is fastest but fails VRAM headroom; size 8 beats safe sizes 1 and 4.
+    assert budget["microbatch"] == 8
+    assert budget["seconds_per_update"] == 1.0
+
+    # With size 8 slower, select size 1 even though the larger size 4 also fits.
+    def slower_large(**kwargs):
+        run(**kwargs)
+        path = kwargs["output"] / "progress.json"
+        progress = read_json(path)
+        if kwargs["config"].microbatch_size == 8:
+            for timing in progress["source_timings"].values():
+                timing["optimizer_seconds"] = 100
+            write_json(path, progress)
+
+    monkeypatch.setattr(sol_training, "run_experiment", slower_large)
+    sol_training.benchmark(pipeline)
+    assert read_json(pipeline.reports / "training-budget.json")["microbatch"] == 1
+
+
 @pytest.mark.parametrize("message", ["non-finite training loss", "unexpected CUDA failure"])
 def test_benchmark_stops_on_unexpected_runtime_failure(tmp_path, monkeypatch, message):
     from asl_recognizer.translation import sol_training

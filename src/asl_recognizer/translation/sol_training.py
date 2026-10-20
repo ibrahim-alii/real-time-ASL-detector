@@ -142,7 +142,8 @@ def benchmark(pipeline: Pipeline) -> None:
     valid = [r for r in measurements if r["passed"] and r["headroom_passed"]]
     if not valid:
         raise ValueError("no stable microbatch with 25% VRAM headroom")
-    chosen = max(valid, key=lambda r: r["microbatch"])
+    # Effective batch size is fixed: faster updates mean more useful examples/sec.
+    chosen = min(valid, key=lambda r: (r["seconds_per_update"], -r["microbatch"]))
     allocation = pipeline.config["allocation_seconds"] * 0.8
     # Cover phase-entry/end selection writes as well as the regular 50-update saves.
     usable = (

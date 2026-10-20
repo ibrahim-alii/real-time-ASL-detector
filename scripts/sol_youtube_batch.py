@@ -84,6 +84,24 @@ def runner(args: list[str], **kwargs: object) -> str:
     return result.stdout
 
 
+def batch_progress(before: dict, after: dict, seconds: float) -> dict:
+    """Measure this invocation's paired-data yield, excluding cached prior successes."""
+    attempted = [row for key, row in after['videos'].items()
+                 if row.get('attempts', 0) > before['videos'].get(key, {}).get('attempts', 0)]
+    available = [row for row in attempted if row['availability'] == 'available']
+    failures = [row for row in attempted if row['availability'] != 'available']
+    return {
+        'attempted_sources': len(attempted),
+        'acquired_pairs': len(available),
+        'paired_artifact_bytes': sum(saved['bytes'] for row in available
+                                     for saved in row.get('files', [])),
+        'failure_categories': dict(Counter(
+            acquisition_failure_kind(str(row.get('reason', ''))) for row in failures)),
+        'seconds': seconds,
+        'pairs_per_hour': len(available) * 3600 / seconds if seconds > 0 else None,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=('probe', 'batch'))
@@ -143,10 +161,21 @@ def main() -> None:
                       project_budget_remaining_bytes=remaining)
         write_json(destination, report)
         with writer_lock(root / 'acquisition.lock'):
-            ledger = acquire_youtube(ids_path=ids, root=root, byte_limit=byte_limit,
-                                     scratch_remaining=lambda: project_headroom(SCRATCH),
-                                     attempts=attempts, seed=42, runner=runner,
-                                     video_limit=video_limit, workers=args.workers)
+            ledger_path = root / 'acquisition.json'
+            before = read_json(ledger_path) if ledger_path.exists() else {'videos': {}}
+            batch_started = time.monotonic()
+            ledger = None
+            try:
+                ledger = acquire_youtube(ids_path=ids, root=root, byte_limit=byte_limit,
+                                         scratch_remaining=lambda: project_headroom(SCRATCH),
+                                         attempts=attempts, seed=42, runner=runner,
+                                         video_limit=video_limit, workers=args.workers)
+            finally:
+                # The downloader persists completed in-flight work before raising.
+                after = ledger if ledger is not None else (
+                    read_json(ledger_path) if ledger_path.exists() else before)
+                report['batch_progress'] = batch_progress(
+                    before, after, time.monotonic() - batch_started)
         report.update(status='completed',
                       **coverage(ledger, ids.read_text().splitlines(), attempts),
                       outcomes=dict(Counter(v['availability'] for v in ledger['videos'].values())))
