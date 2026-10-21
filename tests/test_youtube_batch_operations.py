@@ -168,14 +168,15 @@ def test_cookie_help_link_does_not_override_actual_failure(
     assert 'SECRET_VALUE' not in str(failure.value)
 
 
-def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path) -> None:
+@pytest.mark.parametrize('workers', [3, 10])
+def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path, workers: int) -> None:
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
     batch = load_batch()
     batch.COOKIE = tmp_path / 'cookies.txt'
     batch.COOKIE.write_text('private fixture')
-    barrier = Barrier(3)
+    barrier = Barrier(workers)
     copies: list[Path] = []
 
     def download(args, **kwargs):  # type: ignore[no-untyped-def]
@@ -187,18 +188,18 @@ def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path) -> N
         return SimpleNamespace(returncode=0, stdout='', stderr='')
 
     with (patch.object(batch.subprocess, 'run', side_effect=download),
-          ThreadPoolExecutor(max_workers=3) as pool):
+          ThreadPoolExecutor(max_workers=workers) as pool):
         results = [pool.submit(batch.runner, ['python', '-m', 'yt_dlp', 'source'])
-                   for _ in range(3)]
+                   for _ in range(workers)]
         for result in results:
             result.result()
-    assert len(set(copies)) == 3
+    assert len(set(copies)) == workers
     assert all(not path.exists() for path in copies)
     assert batch.COOKIE.read_text() == 'private fixture'
 
 
 @pytest.mark.parametrize('previous_status', ['completed', 'failed'])
-@pytest.mark.parametrize('workers', [3, 4])
+@pytest.mark.parametrize('workers', [3, 4, 10])
 def test_large_batch_parameters_and_failed_predecessor_guard(
     tmp_path, monkeypatch, previous_status, workers
 ):  # type: ignore[no-untyped-def]
