@@ -303,3 +303,49 @@ def test_failed_batch_reports_persisted_partial_progress(tmp_path, monkeypatch) 
     assert report['batch_progress']['attempted_sources'] == 2
     assert report['batch_progress']['acquired_pairs'] == 1
     assert report['batch_progress']['failure_categories'] == {'access_blocked': 1}
+
+
+@pytest.mark.parametrize('user_hard,group_hard,expected', [
+    (2000, 3000, 700), (500, 3000, 200), (2000, 500, 100), (0, 0, 700),
+])
+def test_actual_quotas_conservatively_bound_project(
+    monkeypatch, user_hard, group_hard, expected,
+):  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    monkeypatch.setattr(batch.os, 'getuid', lambda: 1001, raising=False)
+    root = SimpleNamespace(stat=lambda: SimpleNamespace(st_gid=1002))
+    run = Mock(side_effect=[
+        SimpleNamespace(stdout=f'name,id,size,hard,files,hard\nu,1001,300,{user_hard},10,100\n'),
+        SimpleNamespace(stdout=f'name,id,size,hard,files,hard\ng,1002,400,{group_hard},10,100\n'),
+    ])
+    monkeypatch.setattr(batch.subprocess, 'run', run)
+    assert batch.quota_headroom(root, 1000, 'configured-host') == expected
+    assert all('--sysMgmtdHost=configured-host' in call.args[0]
+               for call in run.call_args_list)
+    assert all('du' not in call.args[0] for call in run.call_args_list)
+
+
+@pytest.mark.parametrize('row', [
+    'u,1001,300,2000,100,100', 'u,1001,-1,2000,1,100',
+    'u,999,300,2000,1,100', 'bad',
+])
+def test_quota_malformed_or_inode_exhausted_fails_closed(monkeypatch, row):  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    monkeypatch.setattr(batch.os, 'getuid', lambda: 1001, raising=False)
+    monkeypatch.setattr(batch.subprocess, 'run',
+                        lambda *args, **kwargs: SimpleNamespace(stdout=row))
+    root = SimpleNamespace(stat=lambda: SimpleNamespace(st_gid=1002))
+    with pytest.raises(RuntimeError):
+        batch.quota_headroom(root, 1000, 'configured-host')
+
+
+def test_quota_accounting_bypasses_project_walk(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    monkeypatch.setenv('ASL_BEEGFS_QUOTA_HOST', 'configured-host')
+    quota = Mock(return_value=700)
+    monkeypatch.setattr(batch, 'quota_headroom', quota)
+    run = Mock(side_effect=AssertionError('whole-project scan must not run'))
+    monkeypatch.setattr(batch.subprocess, 'run', run)
+    assert batch.project_headroom(tmp_path, 1000) == 700
+    quota.assert_called_once_with(tmp_path, 1000, 'configured-host')
+    run.assert_not_called()
