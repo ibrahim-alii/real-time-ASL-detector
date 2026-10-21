@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from ..features.mmpose_backend import MMPoseWholeBodyBackend, WholeBodyFrame
-from ..features.video import iter_every_other_video_frame
+from ..features.video import iter_video_frames
 from .cache import TranslationFeatureCache
 from .contracts import DirectTranslationResult, TranslationRequest
 from .experiment import checkpoint_model_config
@@ -48,7 +48,8 @@ class ExtractionEngine:
         self.initialization_seconds = time.perf_counter() - started
 
     def extract(self, *, video: Path, output: Path, start_ms: int = 0,
-                end_ms: int | None = None, overlay: Path | None = None) -> dict[str, Any]:
+                end_ms: int | None = None, overlay: Path | None = None,
+                native_pose: bool = False) -> dict[str, Any]:
         import cv2
 
         if output.exists():
@@ -69,10 +70,12 @@ class ExtractionEngine:
         timings = {"decode_seconds": 0.0, "pose_seconds": 0.0, "overlay_seconds": 0.0}
         self.backend.reset()
         with ExitStack() as stack:
-            writer = stack.enter_context(OverlayWriter(video, overlay, fps=fps / 2)) \
+            stride = 1 if native_pose else 2
+            writer = stack.enter_context(OverlayWriter(video, overlay, fps=fps / stride)) \
                 if overlay is not None else None
             images = cast(Generator[tuple[Any, int], None, None],
-                          iter_every_other_video_frame(video, start_ms=start_ms, end_ms=end_ms))
+                          iter_video_frames(video, start_ms=start_ms, end_ms=end_ms,
+                                            frame_stride=stride))
             stack.callback(images.close)
             while True:
                 tick = time.perf_counter()
@@ -90,10 +93,12 @@ class ExtractionEngine:
                     writer.append(image, frame)
                     timings["overlay_seconds"] += time.perf_counter() - tick
         tick = time.perf_counter()
-        request = mmpose_translation_request(frames)
+        request = mmpose_translation_request(frames[::2] if native_pose else frames)
         metadata = {"feature_schema": MMPOSE_SCHEMA, "extractor": self.identity,
                     "preprocessing": preprocessing_identity(),
                     "source_video_hash": file_hash(video), "start_ms": start_ms,
+                    "raw_pose_sampling": "every-native-frame-v1" if native_pose
+                    else "every-second-native-frame-v1",
                     "end_ms": end_ms, "fps": fps, "width": int(image.shape[1]),
                     "height": int(image.shape[0])}
         TranslationFeatureCache(output).store("recorded", request, metadata=metadata)
@@ -101,6 +106,7 @@ class ExtractionEngine:
         timings["preparation_seconds"] = time.perf_counter() - tick
         elapsed = time.perf_counter() - started
         report = {**metadata, **timings, "sampled_frames": len(frames),
+                  "raw_pose_frames": len(frames),
                   "encoder_frames": len(request.values), "extraction_seconds": elapsed,
                   "processing_fps": len(frames) / elapsed,
                   "initialization_seconds": self.initialization_seconds,
@@ -200,6 +206,7 @@ def main(argv: list[str] | None = None) -> None:
             return engine.extract(video=request_path(args.work_root, item["video"]),
                 output=request_path(args.work_root, item["output"]),
                 start_ms=int(item.get("start_ms", 0)), end_ms=item.get("end_ms"),
+                native_pose=bool(item.get("native_pose", False)),
                 overlay=request_path(args.work_root, item["overlay"]) if item.get("overlay")
                 else None)
         try:
