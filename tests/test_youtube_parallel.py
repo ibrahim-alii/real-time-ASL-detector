@@ -4,11 +4,13 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from asl_recognizer.translation import acquisition
-from asl_recognizer.translation.sol_common import read_json, write_json
+from asl_recognizer.translation.sol_common import read_json, tree_bytes, write_json
 
 
 @pytest.mark.parametrize(('message', 'expected'), [
@@ -83,6 +85,59 @@ def test_two_sources_overlap_and_only_coordinator_writes_ledger(tmp_path, monkey
     calls.clear()
     acquisition.acquire_youtube(**kwargs, runner=runner)
     assert not calls
+
+
+def test_four_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    _root, kwargs, original = fixture(tmp_path, monkeypatch)
+    kwargs['ids_path'].write_text('abcdefghijk\nlmnopqrstuv\n12345678901\n98765432109\n')
+    kwargs['workers'] = 4
+    barrier = threading.Barrier(4)
+    coordinator = threading.get_ident()
+    save = acquisition._save_youtube_acquisition
+
+    def writer(*args):  # type: ignore[no-untyped-def]
+        assert threading.get_ident() == coordinator
+        save(*args)
+
+    def runner(args: list[str]) -> str:
+        if '--dump-single-json' in args:
+            barrier.wait(timeout=5)
+        return original(args)
+
+    monkeypatch.setattr(acquisition, '_save_youtube_acquisition', writer)
+    result = acquisition.acquire_youtube(**kwargs, runner=runner)
+    assert len(result['videos']) == 4
+    assert all(row['availability'] == 'available' for row in result['videos'].values())
+
+
+def test_fifth_worker_is_rejected_before_acquisition(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match='workers'):
+        acquisition.acquire_youtube(ids_path=tmp_path / 'ids', root=tmp_path, byte_limit=100,
+                                    scratch_remaining=lambda: 100, workers=5)
+
+
+def test_storage_scan_restarts_after_atomic_rename() -> None:
+    entry = Mock()
+    entry.is_file.return_value = True
+    entry.stat.side_effect = [FileNotFoundError('renamed'), SimpleNamespace(st_size=9)]
+    root = Mock()
+    root.rglob.return_value = [entry]
+    assert tree_bytes(root) == 9
+    assert root.rglob.call_count == 2
+
+
+@pytest.mark.parametrize(('error', 'attempts'), [
+    (FileNotFoundError('continuous churn'), 3), (PermissionError('unreadable'), 1),
+])
+def test_storage_scan_never_accepts_incomplete_usage(error: OSError, attempts: int) -> None:
+    entry = Mock()
+    entry.is_file.return_value = True
+    entry.stat.side_effect = error
+    root = Mock()
+    root.rglob.return_value = [entry]
+    with pytest.raises(type(error)):
+        tree_bytes(root)
+    assert root.rglob.call_count == attempts
 
 
 def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
