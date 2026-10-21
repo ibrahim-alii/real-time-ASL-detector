@@ -22,7 +22,15 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit
 from zipfile import ZipFile
 
-from .sol_common import capacity, read_json, scan_tree_bytes, seal, verify_seal, write_json
+from .sol_common import (
+    atomic_replace,
+    capacity,
+    read_json,
+    scan_tree_bytes,
+    seal,
+    verify_seal,
+    write_json,
+)
 from .youtube import channel_split, file_hash
 
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -93,7 +101,7 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | None =
         writer = csv.DictWriter(handle, fieldnames=fields or list(rows[0]), extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
-    temporary.replace(path)
+    atomic_replace(temporary, path)
 
 
 def fetch_ids(url: str, output: Path) -> None:
