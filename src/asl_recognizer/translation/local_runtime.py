@@ -46,6 +46,10 @@ def write_overlay(video: Path, frames: list[tuple[Any, WholeBodyFrame]], output:
     output.with_suffix(".json").write_text(json.dumps({
         "source": str(video), "timestamps_ms": [frame.timestamp_ms for _, frame in frames],
         "playback_fps": 15, "note": "sampled frames; timestamps define source timing",
+        "width": width, "height": height,
+        "frames": [{"timestamp_ms": frame.timestamp_ms,
+                    "coordinates": frame.coordinates.tolist(),
+                    "presence": frame.presence.tolist()} for _, frame in frames],
     }, indent=2) + "\n", encoding="utf-8")
 
 
