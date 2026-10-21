@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import getpass
 import json
 import os
@@ -25,8 +26,33 @@ ROUND = RUN / 'reports/youtube-probe'
 
 
 
+def quota_headroom(scratch: Path, budget: int, host: str) -> int:
+    """User-wide usage conservatively bounds this project's bytes; enforce group quota too."""
+    headrooms = []
+    for flag, identity in (("--uid", os.getuid()), ("--gid", scratch.stat().st_gid)):
+        result = subprocess.run(
+            ['beegfs-ctl', '--getquota', flag, str(identity),
+             '--sysMgmtdHost=' + host, '--csv'],
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+        rows = [row for row in csv.reader(result.stdout.splitlines())
+                if len(row) == 6 and row[1].strip() == str(identity)]
+        if len(rows) != 1:
+            raise RuntimeError('quota response lacks exactly one matching identity')
+        used, hard, files, file_hard = map(int, rows[0][2:])
+        if min(used, hard, files, file_hard) < 0 or (file_hard and files >= file_hard):
+            raise RuntimeError('invalid quota response or inode quota exhausted')
+        if flag == '--uid':
+            headrooms.append(budget - used)
+        if hard:
+            headrooms.append(hard - used)
+    return max(0, min(headrooms))
+
+
 def project_headroom(scratch: Path, budget: int = 1024**4) -> int:
     """Recheck space consumed by this batch and parallel corpus downloads."""
+    if host := os.environ.get("ASL_BEEGFS_QUOTA_HOST"):
+        return quota_headroom(scratch, budget, host)
     for attempt in range(3):
         try:
             usage = subprocess.run(['du', '-sb', str(scratch)], capture_output=True,
@@ -182,16 +208,17 @@ def main() -> None:
             previous = read_json(args.previous_report)
             if previous['status'] != 'completed':
                 raise RuntimeError('predecessor did not complete; investigate before retrying')
-        usage = subprocess.run(['du', '-sb', str(SCRATCH)], capture_output=True,
-                               text=True, check=True, timeout=120)
-        remaining = 1024**4 - int(usage.stdout.split()[0])
+        remaining = project_headroom(SCRATCH)
         # This cap is total corpus staging, not a reservation for each invocation.
         # Reserve a bounded increment; every source is also checked by acquire_youtube.
         reservation = min(byte_limit, 2 * 1024**3)
         if remaining < reservation or shutil.disk_usage(SCRATCH).free < reservation:
             raise RuntimeError('insufficient capacity for bounded acquisition')
-        report.update(scratch_project_bytes=int(usage.stdout.split()[0]),
-                      project_budget_remaining_bytes=remaining)
+        report.update(scratch_project_bytes=1024**4 - remaining,
+                      project_budget_remaining_bytes=remaining,
+                      space_accounting=('conservative-user-and-group-quota'
+                                        if os.environ.get('ASL_BEEGFS_QUOTA_HOST')
+                                        else 'project-du'))
         write_json(destination, report)
         with writer_lock(root / 'acquisition.lock'):
             ledger_path = root / 'acquisition.json'
