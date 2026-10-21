@@ -96,7 +96,8 @@ def test_inference_boundaries_and_single_writer(server: Any, workspace: ModuleTy
     monkeypatch.setattr(workspace, "translate_clip", lambda *_: {"english": "Synthetic result"})
     code, _, body = request(server, "POST", "/api/translate", body=b"test", headers=headers)
     assert code == 200 and json.loads(body)["english"] == "Synthetic result"
-    assert not server.inference_lock.locked()
+    assert server.inference_lock.acquire(timeout=2)
+    server.inference_lock.release()
 
 
 def test_backend_failures_release_writer(server: Any, workspace: ModuleType,
@@ -110,7 +111,8 @@ def test_backend_failures_release_writer(server: Any, workspace: ModuleType,
     code, _, body = request(server, "POST", "/api/translate", body=b"test",
                             headers={"X-ASL-Request": "clip", "Content-Type": "video/webm"})
     assert code == 502 and b"secret-remote-path" not in body
-    assert not server.inference_lock.locked()
+    assert server.inference_lock.acquire(timeout=2)
+    server.inference_lock.release()
 
 
 def test_runtime_requires_slurm(workspace: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
