@@ -283,11 +283,19 @@ def test_parallel_batch_limit_counts_only_new_attempts_on_resume(tmp_path, monke
 
 
 def test_resume_reuses_only_verified_unchanged_artifacts(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    import time
+
     from asl_recognizer.translation import sol_common
 
     root, kwargs, runner = fixture(tmp_path, monkeypatch)
     acquisition.acquire_youtube(**kwargs, runner=runner)
     monkeypatch.setattr(sol_common.sys, 'platform', 'linux')
+    monkeypatch.setattr(time, 'time_ns', lambda: 10**30)
+    ledger = read_json(root / 'acquisition.json')
+    for row in ledger['videos'].values():
+        for saved in row['files']:
+            assert sol_common.verify_seal(saved)
+    write_json(root / 'acquisition.json', ledger)
     digest = Mock(side_effect=AssertionError('unchanged artifact must not be re-read'))
     monkeypatch.setattr(sol_common, 'file_hash', digest)
     calls = Mock(side_effect=AssertionError('completed source must not be requested'))
