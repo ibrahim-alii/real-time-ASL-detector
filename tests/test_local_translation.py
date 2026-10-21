@@ -359,6 +359,7 @@ def test_recorded_extraction_interval_mask_and_overlay(tmp_path: Path, monkeypat
     import cv2
 
     from asl_recognizer.features.mmpose_backend import WholeBodyFrame
+    from asl_recognizer.translation import runtime
 
     video = tmp_path / "recording.mp4"
     writer = cv2.VideoWriter(str(video), cv2.VideoWriter.fourcc(*"mp4v"), 10.0, (64, 64))
@@ -376,11 +377,21 @@ def test_recorded_extraction_interval_mask_and_overlay(tmp_path: Path, monkeypat
         def __exit__(self, *_args: object) -> None:
             pass
 
-        def detect_translation(self, _image: object, timestamp: int) -> WholeBodyFrame:
-            return WholeBodyFrame(np.ones((133, 2), np.float32), np.ones(133, np.bool_), timestamp)
+        def reset(self) -> None:
+            pass
 
-    monkeypatch.setattr(recorded, "MMPoseWholeBodyBackend", Backend)
-    monkeypatch.setattr(recorded, "extractor_identity", lambda *_a: {"fixture": "asset"})
+        def close(self) -> None:
+            pass
+
+        def detect_translation(self, _image: object, timestamp: int) -> WholeBodyFrame:
+            return WholeBodyFrame(np.ones((133, 2), np.float32), np.ones(133, np.bool_), timestamp,
+                                  np.ones(133, np.float32), np.ones((133, 2), np.float32))
+
+    monkeypatch.setattr(recorded, "MMPoseWholeBodyBackend", Backend, raising=False)
+    monkeypatch.setattr(recorded, "extractor_identity",
+                        lambda *_a: {"fixture": "asset"}, raising=False)
+    monkeypatch.setattr(runtime, "MMPoseWholeBodyBackend", Backend)
+    monkeypatch.setattr(runtime, "extractor_identity", lambda *_a: {"fixture": "asset"})
     report = recorded.extract_video(
         video=video,
         assets={},
