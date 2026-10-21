@@ -1,10 +1,16 @@
 """Cached integrity checks must invalidate on file or expected-digest changes."""
 
+import time
 from unittest.mock import Mock
 
 import pytest
 
 from asl_recognizer.translation import sol_common as s
+
+
+@pytest.fixture(autouse=True)
+def mature_file_clock(monkeypatch):
+    monkeypatch.setattr(time, "time_ns", lambda: 10**30)
 
 
 def test_cached_seal_avoids_reread_and_invalidates_expected_hash(tmp_path, monkeypatch):
