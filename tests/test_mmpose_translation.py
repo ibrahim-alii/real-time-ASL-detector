@@ -99,7 +99,9 @@ def test_worker_mmpose_extraction_resumes_and_recomputes_changed_assets(
     monkeypatch.setattr(worker, "_extraction_backend", lambda _args: (backend, identity))
     image = np.zeros((10, 10, 3), np.uint8)
     monkeypatch.setattr(worker, "every_other_video_frame", lambda *_args, **_kwargs:
-                        VideoSample(((image, 0), (image, 10)), 2))
+                        VideoSample(((image, 0), (image, 10)), 2), raising=False)
+    monkeypatch.setattr(worker, "iter_every_other_video_frame", lambda *_args, **_kwargs:
+                        (pair for pair in ((image, 0), (image, 10))), raising=False)
     manifest = build_manifest([
         {"id": "clip", "video_id": "recording", "caption": "hello", "split": "train",
          "start": 0, "end": 1}
