@@ -39,7 +39,9 @@ def quota_headroom(scratch: Path, budget: int, host: str) -> int:
                 if len(row) == 6 and row[1].strip() == str(identity)]
         if len(rows) != 1:
             raise RuntimeError('quota response lacks exactly one matching identity')
-        used, hard, files, file_hard = map(int, rows[0][2:])
+        used, files = int(rows[0][2]), int(rows[0][4])
+        hard, file_hard = (0 if value.strip().lower() == "unlimited" else int(value)
+                           for value in (rows[0][3], rows[0][5]))
         if min(used, hard, files, file_hard) < 0 or (file_hard and files >= file_hard):
             raise RuntimeError('invalid quota response or inode quota exhausted')
         if flag == '--uid':
