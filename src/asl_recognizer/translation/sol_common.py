@@ -124,20 +124,27 @@ def verify_seal(value: dict[str, Any], *, cached: bool = False) -> bool:
     try:
         if not path.is_file():
             return False
-        before = _seal_stat(path)
-        if before[2] != value["bytes"]:
-            return False
-        signature = {"identity": before, "sha256": value["sha256"], "version": 2}
-        # BeeGFS timestamps are whole seconds: certify only after that interval has settled.
-        stable = sys.platform == "linux" and time.time_ns() - before[4] >= 2_000_000_000
-        if cached and stable and value.get("verified_stat") == signature:
+        for attempt in range(2):
+            before = _seal_stat(path)
+            if before[2] != value["bytes"]:
+                return False
+            signature = {"identity": before, "sha256": value["sha256"], "version": 2}
+            # BeeGFS timestamps are whole seconds: certify only after that interval has settled.
+            stable = sys.platform == "linux" and time.time_ns() - before[4] >= 2_000_000_000
+            if attempt == 0 and cached and stable and value.get("verified_stat") == signature:
+                return True
+            if file_hash(path) != value["sha256"]:
+                return False
+            if _seal_stat(path) != before:
+                if not cached:
+                    return False
+                # A first read can update BeeGFS metadata; rehash once against the new identity.
+                continue
+            if stable:
+                value["verified_stat"] = signature
+            else:
+                value.pop("verified_stat", None)
             return True
-        if file_hash(path) != value["sha256"] or _seal_stat(path) != before:
-            return False
-        if stable:
-            value["verified_stat"] = signature
-        else:
-            value.pop("verified_stat", None)
-        return True
+        return False
     except FileNotFoundError:
         return False
