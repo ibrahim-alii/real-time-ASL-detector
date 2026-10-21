@@ -280,3 +280,22 @@ def test_parallel_batch_limit_counts_only_new_attempts_on_resume(tmp_path, monke
     result = acquisition.acquire_youtube(**kwargs, runner=runner, video_limit=2)
     assert len(metadata) == 1
     assert len(result["videos"]) == 3
+
+
+def test_resume_reuses_only_verified_unchanged_artifacts(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+    from asl_recognizer.translation import sol_common
+
+    root, kwargs, runner = fixture(tmp_path, monkeypatch)
+    acquisition.acquire_youtube(**kwargs, runner=runner)
+    monkeypatch.setattr(sol_common.sys, 'platform', 'linux')
+    digest = Mock(side_effect=AssertionError('unchanged artifact must not be re-read'))
+    monkeypatch.setattr(sol_common, 'file_hash', digest)
+    calls = Mock(side_effect=AssertionError('completed source must not be requested'))
+    ledger = acquisition.acquire_youtube(**kwargs, runner=calls)
+    assert len(ledger['videos']) == 3
+    assert all(row['availability'] == 'available' for row in ledger['videos'].values())
+    assert all('verified_stat' in saved
+               for row in read_json(root / 'acquisition.json')['videos'].values()
+               for saved in row['files'])
+    digest.assert_not_called()
+    calls.assert_not_called()
