@@ -7,6 +7,7 @@ import json
 import math
 import os
 import shutil
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -79,14 +80,35 @@ def writer_lock(path: Path) -> Iterator[None]:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+def _seal_stat(path: Path) -> list[int]:
+    value = path.stat()
+    return [value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns]
+
+
 def seal(path: Path) -> dict[str, object]:
-    return {"path": str(path), "bytes": path.stat().st_size, "sha256": file_hash(path)}
+    before = _seal_stat(path)
+    digest = file_hash(path)
+    if _seal_stat(path) != before:
+        raise ValueError("file changed while sealing")
+    return {"path": str(path), "bytes": before[2], "sha256": digest,
+            "verified_stat": {"identity": before, "sha256": digest}}
 
 
-def verify_seal(value: dict[str, Any]) -> bool:
+def verify_seal(value: dict[str, Any], *, cached: bool = False) -> bool:
     path = Path(value["path"])
-    return (
-        path.is_file()
-        and path.stat().st_size == value["bytes"]
-        and file_hash(path) == value["sha256"]
-    )
+    try:
+        if not path.is_file():
+            return False
+        before = _seal_stat(path)
+        if before[2] != value["bytes"]:
+            return False
+        signature = {"identity": before, "sha256": value["sha256"]}
+        # Linux ctime invalidates same-size edits even when mtime is restored.
+        if cached and sys.platform == "linux" and value.get("verified_stat") == signature:
+            return True
+        if file_hash(path) != value["sha256"] or _seal_stat(path) != before:
+            return False
+        value["verified_stat"] = signature
+        return True
+    except FileNotFoundError:
+        return False
