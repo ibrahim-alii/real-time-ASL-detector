@@ -349,3 +349,15 @@ def test_quota_accounting_bypasses_project_walk(tmp_path, monkeypatch):  # type:
     assert batch.project_headroom(tmp_path, 1000) == 700
     quota.assert_called_once_with(tmp_path, 1000, 'configured-host')
     run.assert_not_called()
+
+
+def test_unlimited_quota_fields_still_enforce_project_budget(monkeypatch):  # type: ignore[no-untyped-def]
+    batch = load_batch()
+    monkeypatch.setattr(batch.os, 'getuid', lambda: 1001, raising=False)
+    root = SimpleNamespace(stat=lambda: SimpleNamespace(st_gid=1002))
+    run = Mock(side_effect=[
+        SimpleNamespace(stdout='u,1001,300,unlimited,10,unlimited\n'),
+        SimpleNamespace(stdout='g,1002,400,unlimited,20,unlimited\n'),
+    ])
+    monkeypatch.setattr(batch.subprocess, 'run', run)
+    assert batch.quota_headroom(root, 1000, 'configured-host') == 700
