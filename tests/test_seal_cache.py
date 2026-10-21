@@ -117,3 +117,39 @@ def test_mature_recheck_enables_cache_and_old_cache_version_rehashed(tmp_path, m
     assert s.verify_seal(saved, cached=True) and h.call_count == 2
     saved["verified_stat"].pop("version")
     assert s.verify_seal(saved, cached=True) and h.call_count == 3
+
+
+def test_cached_check_rehashes_once_after_read_updates_metadata(tmp_path, monkeypatch):
+    p = tmp_path / "a"
+    p.write_bytes(b"good")
+    value = s.seal(p)
+    value.pop("verified_stat")
+    before = s._seal_stat(p)
+    after = [*before[:-1], before[-1] + 1]
+    stats = iter([before, after, after, after])
+    monkeypatch.setattr(s, "_seal_stat", lambda _: next(stats))
+    digest = Mock(wraps=s.file_hash)
+    monkeypatch.setattr(s, "file_hash", digest)
+    assert s.verify_seal(value, cached=True)
+    assert digest.call_count == 2
+    assert value["verified_stat"]["identity"] == after
+
+
+def test_cached_recheck_rejects_changed_bytes_and_unstable_metadata(tmp_path, monkeypatch):
+    p = tmp_path / "a"
+    p.write_bytes(b"good")
+    value = s.seal(p)
+    value.pop("verified_stat")
+    before = s._seal_stat(p)
+    after = [*before[:-1], before[-1] + 1]
+    stats = iter([before, after, after])
+    monkeypatch.setattr(s, "_seal_stat", lambda _: next(stats))
+    digest = Mock(side_effect=[value["sha256"], "changed"])
+    monkeypatch.setattr(s, "file_hash", digest)
+    assert not s.verify_seal(value, cached=True)
+    assert digest.call_count == 2 and "verified_stat" not in value
+    stats = iter([before, after, after, [*after[:-1], after[-1] + 1]])
+    monkeypatch.setattr(s, "_seal_stat", lambda _: next(stats))
+    digest.side_effect = [value["sha256"], value["sha256"]]
+    assert not s.verify_seal(value, cached=True)
+    assert "verified_stat" not in value
