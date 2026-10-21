@@ -19,6 +19,19 @@ from .youtube import file_hash
 GIB = 1024**3
 
 
+def atomic_replace(temporary: Path, destination: Path) -> None:
+    """Windows readers/scanners can briefly deny replacement of a closed file."""
+    for attempt in range(6):
+        try:
+            temporary.replace(destination)
+            return
+        except PermissionError as error:
+            if (sys.platform != "win32" or getattr(error, "winerror", None) not in {5, 32, 33}
+                    or attempt == 5):
+                raise
+            time.sleep(0.02 * 2**attempt)
+
+
 def write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -27,7 +40,7 @@ def write_json(path: Path, value: object) -> None:
         handle.write("\n")
         handle.flush()
         os.fsync(handle.fileno())
-    temporary.replace(path)
+    atomic_replace(temporary, path)
 
 
 def read_json(path: Path) -> dict[str, Any]:
