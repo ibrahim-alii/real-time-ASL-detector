@@ -10,6 +10,7 @@ from asl_recognizer.translation import sol_common as s
 
 @pytest.fixture(autouse=True)
 def mature_file_clock(monkeypatch):
+    monkeypatch.setattr(s.sys, "platform", "linux")
     monkeypatch.setattr(time, "time_ns", lambda: 10**30)
 
 
