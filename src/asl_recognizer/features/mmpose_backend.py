@@ -18,6 +18,8 @@ class WholeBodyFrame:
     coordinates: npt.NDArray[np.float32]
     presence: npt.NDArray[np.bool_]
     timestamp_ms: int
+    scores: npt.NDArray[np.float32] | None = None
+    raw_coordinates: npt.NDArray[np.float32] | None = None
 
     def __post_init__(self) -> None:
         if self.coordinates.shape != (WHOLEBODY_POINTS, 2):
@@ -28,6 +30,18 @@ class WholeBodyFrame:
             raise ValueError("whole-body coordinates must be finite float32")
         if self.timestamp_ms < 0 or np.any(self.coordinates[~self.presence] != 0):
             raise ValueError("invalid timestamp or nonzero missing landmarks")
+        if self.scores is not None and (
+            self.scores.shape != (WHOLEBODY_POINTS,) or self.scores.dtype != np.float32
+            or not np.isfinite(self.scores).all()
+            or np.any((self.scores < 0) | (self.scores > 1))
+        ):
+            raise ValueError("whole-body scores must be finite float32 values in [0, 1]")
+        if self.raw_coordinates is not None and (
+            self.raw_coordinates.shape != (WHOLEBODY_POINTS, 2)
+            or self.raw_coordinates.dtype != np.float32
+            or not np.isfinite(self.raw_coordinates).all()
+        ):
+            raise ValueError("raw coordinates must be finite float32 [133, 2]")
 
 
 class MMPoseWholeBodyBackend:
@@ -110,6 +124,8 @@ class MMPoseWholeBodyBackend:
             raise ValueError("ambiguous multiple-person frame")
         coordinates = np.zeros((WHOLEBODY_POINTS, 2), dtype=np.float32)
         presence = np.zeros(WHOLEBODY_POINTS, dtype=np.bool_)
+        raw_coordinates = coordinates.copy()
+        raw_scores = np.zeros(WHOLEBODY_POINTS, dtype=np.float32)
         if people:
             points = np.asarray(people[0]["keypoints"], dtype=np.float32)
             scores = np.asarray(people[0]["keypoint_scores"], dtype=np.float32)
@@ -119,8 +135,11 @@ class MMPoseWholeBodyBackend:
                 np.isfinite(points).all(axis=1) & np.isfinite(scores)
                 & (scores >= confidence_threshold)
             )
+            finite = np.isfinite(points).all(axis=1) & np.isfinite(scores)
+            raw_coordinates[finite] = points[finite]
+            raw_scores[finite] = np.clip(scores[finite], 0, 1)
             coordinates[presence] = points[presence]
-        return WholeBodyFrame(coordinates, presence, timestamp_ms)
+        return WholeBodyFrame(coordinates, presence, timestamp_ms, raw_scores, raw_coordinates)
 
     def reset(self) -> None:
         # Each numpy image is processed independently, without a video tracker.
