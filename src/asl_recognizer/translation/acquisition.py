@@ -22,7 +22,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit
 from zipfile import ZipFile
 
-from .sol_common import capacity, read_json, seal, tree_bytes, verify_seal, write_json
+from .sol_common import capacity, read_json, scan_tree_bytes, seal, verify_seal, write_json
 from .youtube import channel_split, file_hash
 
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -161,7 +161,7 @@ class _Reservations:
         allocation = math.ceil(estimated * 1.3)
         required = allocation * (2 if muxed else 1)
         with self.lock:
-            headroom = min(self.remaining(), self.limit - tree_bytes(self.root),
+            headroom = min(self.remaining(), self.limit - scan_tree_bytes(self.root),
                            shutil.disk_usage(self.root).free)
             capacity(self.root, required, remaining_quota=max(0, headroom - self.outstanding),
                      margin=0)
@@ -397,7 +397,7 @@ def acquire_youtube(
                 except StopIteration:
                     exhausted = True
                     break
-                if tree_bytes(root) >= byte_limit:
+                if scan_tree_bytes(root) >= byte_limit:
                     stop.set()
                     fatal = ValueError(
                         "YouTube staging byte limit reached before enough accepted pairs"
@@ -442,7 +442,7 @@ def acquire_youtube(
                     fatal = fatal or error
                     stop.set()
                 _save_youtube_acquisition(root, ledger)
-            if tree_bytes(root) > byte_limit:
+            if scan_tree_bytes(root) > byte_limit:
                 fatal = fatal or ValueError("YouTube staging exceeded byte limit; stop acquisition")
                 stop.set()
             if not stop.is_set():
