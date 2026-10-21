@@ -8,6 +8,7 @@ import math
 import os
 import shutil
 import sys
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -108,11 +109,14 @@ def _seal_stat(path: Path) -> list[int]:
 
 def seal(path: Path) -> dict[str, object]:
     before = _seal_stat(path)
+    stable = sys.platform == "linux" and time.time_ns() - before[4] >= 2_000_000_000
     digest = file_hash(path)
     if _seal_stat(path) != before:
         raise ValueError("file changed while sealing")
-    return {"path": str(path), "bytes": before[2], "sha256": digest,
-            "verified_stat": {"identity": before, "sha256": digest}}
+    result: dict[str, object] = {"path": str(path), "bytes": before[2], "sha256": digest}
+    if stable:
+        result["verified_stat"] = {"identity": before, "sha256": digest, "version": 2}
+    return result
 
 
 def verify_seal(value: dict[str, Any], *, cached: bool = False) -> bool:
@@ -123,13 +127,17 @@ def verify_seal(value: dict[str, Any], *, cached: bool = False) -> bool:
         before = _seal_stat(path)
         if before[2] != value["bytes"]:
             return False
-        signature = {"identity": before, "sha256": value["sha256"]}
-        # Linux ctime invalidates same-size edits even when mtime is restored.
-        if cached and sys.platform == "linux" and value.get("verified_stat") == signature:
+        signature = {"identity": before, "sha256": value["sha256"], "version": 2}
+        # BeeGFS timestamps are whole seconds: certify only after that interval has settled.
+        stable = sys.platform == "linux" and time.time_ns() - before[4] >= 2_000_000_000
+        if cached and stable and value.get("verified_stat") == signature:
             return True
         if file_hash(path) != value["sha256"] or _seal_stat(path) != before:
             return False
-        value["verified_stat"] = signature
+        if stable:
+            value["verified_stat"] = signature
+        else:
+            value.pop("verified_stat", None)
         return True
     except FileNotFoundError:
         return False
