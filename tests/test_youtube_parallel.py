@@ -87,7 +87,7 @@ def test_two_sources_overlap_and_only_coordinator_writes_ledger(tmp_path, monkey
     assert not calls
 
 
-@pytest.mark.parametrize('workers', [4, 10])
+@pytest.mark.parametrize('workers', [4, 10, 20])
 def test_parallel_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch, workers):  # type: ignore[no-untyped-def]
     _root, kwargs, original = fixture(tmp_path, monkeypatch)
     kwargs['ids_path'].write_text('\n'.join(str(10000000000 + i) for i in range(workers)) + '\n')
@@ -111,7 +111,7 @@ def test_parallel_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch, 
     assert all(row['availability'] == 'available' for row in result['videos'].values())
 
 
-@pytest.mark.parametrize('workers', [0, 5, 9, 11])
+@pytest.mark.parametrize('workers', [0, 5, 9, 11, 19, 21])
 def test_unsupported_worker_count_is_rejected_before_acquisition(
     tmp_path: Path, workers: int,
 ) -> None:
@@ -144,7 +144,7 @@ def test_storage_scan_never_accepts_incomplete_usage(error: OSError, attempts: i
     assert root.rglob.call_count == attempts
 
 
-@pytest.mark.parametrize('workers', [2, 10])
+@pytest.mark.parametrize('workers', [2, 10, 20])
 def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkeypatch, workers):  # type: ignore[no-untyped-def]
     root, kwargs, original = fixture(tmp_path, monkeypatch)
     kwargs['ids_path'].write_text(
