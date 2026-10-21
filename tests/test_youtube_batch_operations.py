@@ -213,9 +213,13 @@ def test_large_batch_parameters_and_failed_predecessor_guard(
     monkeypatch.setattr(batch, 'SCRATCH', scratch)
     monkeypatch.setattr(batch, 'COOKIE', SimpleNamespace(
         is_file=lambda: True, stat=lambda: SimpleNamespace(st_mode=0o100600)))
+    monkeypatch.setattr(batch, 'file_hash', lambda path: 'fixture', raising=False)
     monkeypatch.setattr(batch, 'read_json', lambda path: (
         {'status': previous_status} if path.name == 'previous.json'
-        else {'status': 'completed', 'available': 1}))
+        else {'status': 'completed', 'mode': 'probe', 'available': 1,
+              'completed_at_unix': batch.time.time(), 'batch_progress': {'acquired_pairs': 1},
+              'probe_identity': {'version': 1, 'cookie_sha256': 'fixture',
+                                 'official_ids_sha256': 'fixture'}}))
     monkeypatch.setattr(batch.subprocess, 'run', lambda *a, **k: SimpleNamespace(stdout='0'))
     monkeypatch.setattr(batch.shutil, 'disk_usage', lambda path: SimpleNamespace(free=1024**4))
     monkeypatch.setattr(batch, 'writer_lock', lambda path: nullcontext())
@@ -277,11 +281,17 @@ def test_failed_batch_reports_persisted_partial_progress(tmp_path, monkeypatch) 
     (staging / 'official-ids.txt').write_text('one\ntwo\n')
     directory = run / 'reports' / 'failed-round'
     probe = tmp_path / 'probe.json'
-    probe.write_text(json.dumps({'status': 'completed', 'available': 1}))
+    probe.write_text(json.dumps({
+        'status': 'completed', 'mode': 'probe', 'available': 1,
+        'completed_at_unix': batch.time.time(), 'batch_progress': {'acquired_pairs': 1},
+        'probe_identity': {'version': 1, 'cookie_sha256': 'fixture',
+                           'official_ids_sha256': 'fixture'},
+    }))
     monkeypatch.setattr(batch, 'RUN', run)
     monkeypatch.setattr(batch, 'SCRATCH', scratch)
     monkeypatch.setattr(batch, 'COOKIE', SimpleNamespace(
         is_file=lambda: True, stat=lambda: SimpleNamespace(st_mode=0o100600)))
+    monkeypatch.setattr(batch, 'file_hash', lambda path: 'fixture', raising=False)
     monkeypatch.setattr(batch.subprocess, 'run', lambda *a, **k: SimpleNamespace(stdout='0'))
     monkeypatch.setattr(batch.shutil, 'disk_usage', lambda path: SimpleNamespace(free=1024**4))
     monkeypatch.setattr(batch, 'writer_lock', lambda path: nullcontext())
