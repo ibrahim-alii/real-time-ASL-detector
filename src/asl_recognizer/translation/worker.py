@@ -12,17 +12,22 @@ import hashlib
 import json
 import math
 import time
+from collections.abc import Generator
+from contextlib import ExitStack
 from pathlib import Path
+from typing import Any, cast
 
 from ..features.mmpose_backend import MMPoseWholeBodyBackend
-from ..features.video import every_other_video_frame
+from ..features.video import iter_every_other_video_frame
 from .cache import TranslationFeatureCache
 from .data_audit import audit_manifest, read_signer_map
 from .evaluation import evaluate_checkpoint
 from .features import mmpose_translation_request
 from .how2sign import build_how2sign_manifest
-from .local_runtime import extractor_identity
+from .local_runtime import OverlayWriter, extractor_identity
 from .manifest import build_manifest, read_manifest, write_manifest
+from .pose_cache import PoseCache, pose_quality
+from .runtime import preprocessing_identity
 from .schema import MMPOSE_SCHEMA
 from .sol_common import write_json
 from .youtube import file_hash
@@ -332,6 +337,8 @@ def main(argv: list[str] | None = None) -> int:
                 and (args.splits is None or item.split in args.splits)]
         args.output.mkdir(parents=True, exist_ok=True)
         cache = TranslationFeatureCache(args.output)
+        raw_cache = PoseCache(args.output / "raw-pose")
+        preprocessing = preprocessing_identity()
         videos = _video_index(args.video_root)
         video_hashes: dict[Path, str] = {}
         completed: list[str] = []
@@ -362,32 +369,54 @@ def main(argv: list[str] | None = None) -> int:
                     "manifest_hash": manifest.fingerprint,
                     **extractor_identity,
                     "source_video_hash": video_hashes[video_path],
+                    "start_ms": item.start_ms,
+                    "end_ms": item.end_ms,
+                    "preprocessing": preprocessing,
+                    "raw_pose_sampling": "every-second-native-frame-v1",
                 }
                 overlay_requested = args.overlay_root is not None \
                     and (overlay_ids is None or item.clip_id in overlay_ids)
                 overlay_path = (args.overlay_root / (hashlib.sha256(
                     item.clip_id.encode()).hexdigest() + ".mp4")) if overlay_requested else None
-                if cache.find_valid(item.clip_id, expected_metadata=identity) is not None \
+                try:
+                    raw_cache.load(item.clip_id, expected_metadata=identity)
+                    raw_valid = True
+                except (OSError, RuntimeError, ValueError, KeyError):
+                    raw_valid = False
+                if raw_valid and cache.find_valid(
+                        item.clip_id, expected_metadata=identity) is not None \
                         and (overlay_path is None or overlay_path.is_file()):
                     completed.append(item.clip_id)
                     continue
                 try:
-                    sampled = every_other_video_frame(
-                        video_path, start_ms=item.start_ms, end_ms=item.end_ms
-                    )
                     detector.reset()
-                    wholebody_frames = [
-                        detector.detect_translation(frame, timestamp)
-                        for frame, timestamp in sampled.frames
-                    ]
-                    if overlay_path is not None:
-                        from .local_runtime import write_overlay
-                        write_overlay(video_path, list(zip(
-                            (frame for frame, _ in sampled.frames),
-                            wholebody_frames, strict=True
-                        )), overlay_path)
+                    wholebody_frames = []
+                    with ExitStack() as stack:
+                        writer = None
+                        if overlay_path is not None:
+                            import cv2
+                            capture = cv2.VideoCapture(str(video_path))
+                            try:
+                                fps = capture.get(cv2.CAP_PROP_FPS)
+                                if not capture.isOpened() or not math.isfinite(fps) or fps <= 0:
+                                    raise ValueError("unreadable overlay video frame rate")
+                            finally:
+                                capture.release()
+                            writer = stack.enter_context(OverlayWriter(
+                                video_path, overlay_path, fps=fps / 2))
+                        images = cast(Generator[tuple[Any, int], None, None],
+                                      iter_every_other_video_frame(
+                                          video_path, start_ms=item.start_ms, end_ms=item.end_ms))
+                        stack.callback(images.close)
+                        for image, timestamp in images:
+                            frame = detector.detect_translation(image, timestamp)
+                            wholebody_frames.append(frame)
+                            if writer is not None:
+                                writer.append(image, frame)
                     request = mmpose_translation_request(wholebody_frames)
-                    cache.store(item.clip_id, request, metadata=identity)
+                    metadata = {**identity, "quality": pose_quality(wholebody_frames)}
+                    cache.store(item.clip_id, request, metadata=metadata)
+                    raw_cache.store(item.clip_id, wholebody_frames, metadata=metadata)
                     completed.append(item.clip_id)
                 except (OSError, RuntimeError, ValueError) as error:
                     failures[item.clip_id] = str(error)
