@@ -75,8 +75,11 @@ class WarmRuntime:
                     ],
                     env={**env, "PYTHONPATH": src},
                     stderr=log,
+                    timeout=600,
                 )
             )
+            # Cold checkpoint startup has a separate budget from per-clip processing.
+            self.translator.timeout = 300
         except BaseException:
             self.stack.close()
             raise
