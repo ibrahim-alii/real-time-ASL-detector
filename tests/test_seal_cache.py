@@ -86,3 +86,34 @@ def test_changed_while_verifying_does_not_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(s, "_seal_stat", lambda _: next(stats))
     assert not s.verify_seal(value)
     assert "verified_stat" not in value
+
+
+def test_recent_coarse_metadata_never_reuses_hash(tmp_path, monkeypatch):
+    p = tmp_path / "x"
+    p.write_bytes(b"good")
+    before = s._seal_stat(p)
+    monkeypatch.setattr(s.sys, "platform", "linux")
+    monkeypatch.setattr(s.time, "time_ns", lambda: before[4] + 500_000_000)
+    saved = s.seal(p)
+    assert "verified_stat" not in saved
+    saved["verified_stat"] = {"identity": before, "sha256": saved["sha256"], "version": 2}
+    p.write_bytes(b"evil")
+    monkeypatch.setattr(s, "_seal_stat", lambda _: before)
+    assert not s.verify_seal(saved, cached=True)
+
+
+def test_mature_recheck_enables_cache_and_old_cache_version_rehashed(tmp_path, monkeypatch):
+    p = tmp_path / "x"
+    p.write_bytes(b"good")
+    before = s._seal_stat(p)
+    monkeypatch.setattr(s.sys, "platform", "linux")
+    monkeypatch.setattr(s.time, "time_ns", lambda: before[4] + 500_000_000)
+    saved = s.seal(p)
+    h = Mock(wraps=s.file_hash)
+    monkeypatch.setattr(s, "file_hash", h)
+    assert s.verify_seal(saved, cached=True) and h.call_count == 1 and "verified_stat" not in saved
+    monkeypatch.setattr(s.time, "time_ns", lambda: before[4] + 3_000_000_000)
+    assert s.verify_seal(saved, cached=True) and h.call_count == 2
+    assert s.verify_seal(saved, cached=True) and h.call_count == 2
+    saved["verified_stat"].pop("version")
+    assert s.verify_seal(saved, cached=True) and h.call_count == 3
