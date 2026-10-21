@@ -87,11 +87,12 @@ def test_two_sources_overlap_and_only_coordinator_writes_ledger(tmp_path, monkey
     assert not calls
 
 
-def test_four_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize('workers', [4, 10])
+def test_parallel_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch, workers):  # type: ignore[no-untyped-def]
     _root, kwargs, original = fixture(tmp_path, monkeypatch)
-    kwargs['ids_path'].write_text('abcdefghijk\nlmnopqrstuv\n12345678901\n98765432109\n')
-    kwargs['workers'] = 4
-    barrier = threading.Barrier(4)
+    kwargs['ids_path'].write_text('\n'.join(str(10000000000 + i) for i in range(workers)) + '\n')
+    kwargs['workers'] = workers
+    barrier = threading.Barrier(workers)
     coordinator = threading.get_ident()
     save = acquisition._save_youtube_acquisition
 
@@ -106,14 +107,17 @@ def test_four_sources_overlap_with_one_ledger_writer(tmp_path, monkeypatch):  # 
 
     monkeypatch.setattr(acquisition, '_save_youtube_acquisition', writer)
     result = acquisition.acquire_youtube(**kwargs, runner=runner)
-    assert len(result['videos']) == 4
+    assert len(result['videos']) == workers
     assert all(row['availability'] == 'available' for row in result['videos'].values())
 
 
-def test_fifth_worker_is_rejected_before_acquisition(tmp_path: Path) -> None:
+@pytest.mark.parametrize('workers', [0, 5, 9, 11])
+def test_unsupported_worker_count_is_rejected_before_acquisition(
+    tmp_path: Path, workers: int,
+) -> None:
     with pytest.raises(ValueError, match='workers'):
         acquisition.acquire_youtube(ids_path=tmp_path / 'ids', root=tmp_path, byte_limit=100,
-                                    scratch_remaining=lambda: 100, workers=5)
+                                    scratch_remaining=lambda: 100, workers=workers)
 
 
 def test_storage_scan_restarts_after_atomic_rename() -> None:
@@ -140,9 +144,13 @@ def test_storage_scan_never_accepts_incomplete_usage(error: OSError, attempts: i
     assert root.rglob.call_count == attempts
 
 
-def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize('workers', [2, 10])
+def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkeypatch, workers):  # type: ignore[no-untyped-def]
     root, kwargs, original = fixture(tmp_path, monkeypatch)
-    barrier = threading.Barrier(2)
+    kwargs['ids_path'].write_text(
+        '\n'.join(str(10000000000 + i) for i in range(workers + 1)) + '\n')
+    kwargs['workers'] = workers
+    barrier = threading.Barrier(workers)
     committed_failure = threading.Event()
     lock = threading.Lock()
     metadata: list[str] = []
@@ -171,7 +179,7 @@ def test_access_block_drains_workers_and_does_not_schedule_more(tmp_path, monkey
         acquisition.acquire_youtube(**kwargs, runner=runner)
     assert acquisition.acquisition_failure_kind(str(failure.value)) == "access_blocked"
     ledger = read_json(root / "acquisition.json")
-    assert len(metadata) == 2
+    assert len(metadata) == workers
     # Metadata-only cancellation refunds the source attempt completely.
     assert len(ledger["videos"]) == 1
     assert all(row["availability"] != "available" for row in ledger["videos"].values())
