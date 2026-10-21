@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f5ef">
+<link rel="icon" href="data:,">
+<title>ASL — Signing workspace</title>
+<style>
+:root{color-scheme:light;--paper:#f5f5ef;--ink:#202e28;--muted:#58665d;--line:#d6ddd4;--green:#265b40;--tint:#e5ece2;--stage:#18241f;--error:#9a302a;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink)}button,input{font:inherit}button{cursor:pointer;min-height:44px;border:1px solid var(--line);border-radius:7px;padding:10px 17px;background:transparent;color:var(--ink);font-weight:600;transition:background .16s ease-out}button:hover:not(:disabled){background:var(--tint)}button:disabled{cursor:not-allowed;color:#6b756d;background:#ebeee7}button.primary{background:var(--green);border-color:var(--green);color:white}button.primary:hover:not(:disabled){background:#19472f}button.primary:disabled{background:#dce3d8;border-color:#dce3d8;color:#5e6d61}button.danger{background:#963b33;border-color:#963b33;color:white}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #b86a28;outline-offset:4px}::selection{background:#c7dec3;color:#172e20}input{accent-color:var(--green);caret-color:var(--green)}a{color:var(--green);text-underline-offset:4px}svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}button svg{width:18px;height:18px;vertical-align:-3px;margin-right:7px}header{max-width:1440px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:25px 48px;border-bottom:1px solid var(--line);gap:20px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-size:21px;font-weight:750;letter-spacing:-.03em}.brand svg{width:30px;height:30px}.brand span{border-left:1px solid var(--line);padding-left:16px;margin-left:4px;color:var(--muted);font-weight:400;font-size:14px;letter-spacing:0}.connection{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}.dot{height:7px;width:7px;border-radius:50%;background:#7b826e;flex-shrink:0}.dot.online{background:var(--green)}.link-button{border:0;padding:5px 9px;font-size:13px;min-height:36px;text-decoration:underline;text-underline-offset:3px}main{max-width:1440px;margin:auto;padding:42px 48px 28px}h1{font-size:clamp(27px,3vw,38px);font-weight:600;letter-spacing:-.035em;line-height:1.2;margin:0 0 10px;text-wrap:balance}.intro{color:var(--muted);margin:0 0 34px;max-width:70ch}.workspace{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fcfcf8;box-shadow:0 12px 36px -24px #20352b55}.capture{min-width:0;border-right:1px solid var(--line)}.panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;gap:12px;min-height:68px}h2{font-size:15px;font-weight:650;margin:0}.small{font-size:12px;color:var(--muted)}.timer{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}.stage{position:relative;background:var(--stage);aspect-ratio:4/3;overflow:hidden;color:#d2dfd5}.stage video{width:100%;height:100%;object-fit:contain;display:block}.stage canvas{position:absolute;pointer-events:none;inset:0;width:100%;height:100%;object-fit:contain}.stage.preview.mirror video{transform:scaleX(-1)}.stage .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:26px;text-align:center}.camera-icon{width:56px;height:56px;margin-bottom:18px;color:#abc0af}.empty strong{font-size:20px;font-weight:500}.empty p{font-size:14px;max-width:31ch;color:#b0c1b5;margin:8px 0 22px}.empty button{color:#e3ece5;border-color:#647b6b}.empty button:hover:not(:disabled){background:#304a39}.stage-label{position:absolute;left:18px;top:16px;background:#15231ee6;border:1px solid #5a6c60;padding:4px 10px;border-radius:4px;font-size:12px;pointer-events:none}.stage-label.recording{background:#752c27;color:white;border-color:#ad5b54}.options{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px}.options label{display:flex;gap:7px;align-items:center;min-height:24px}.options input{width:16px;height:16px;margin:0}.actions{padding:18px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.actions .small{margin-left:auto}.translation{display:flex;flex-direction:column;min-width:0}.translation .panel-head{border-bottom:1px solid var(--line)}.language{font-size:12px;color:var(--muted)}.output{padding:30px 28px;flex:1;min-height:230px}.output-empty{padding-top:46px}.output-icon{width:34px;height:34px;color:#7d927f;margin-bottom:18px}.output h3{margin:0 0 8px;font-size:20px;font-weight:500;letter-spacing:-.02em}.output p{font-size:14px;color:var(--muted);max-width:33ch;margin:0}.english{font-size:clamp(23px,2.3vw,31px);line-height:1.45;letter-spacing:-.025em;overflow-wrap:anywhere;white-space:pre-wrap}.result-meta{margin-top:22px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}.translate-actions{padding:0 28px 24px;display:flex;gap:8px;flex-wrap:wrap}.translate-actions .primary{flex:1}.notice{padding:17px 28px;border-top:1px solid var(--line);background:#f0f3eb;font-size:12px;color:#52604e;margin:0}.status-row{display:flex;align-items:flex-start;gap:12px;margin:18px 0 0;min-height:24px;color:var(--muted);font-size:13px}.status-row .dot{margin-top:7px}.status-row.error{color:var(--error)}.status-row.error .dot{background:var(--error)}.guidance{display:flex;justify-content:space-between;gap:25px;margin-top:26px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}.guidance p{margin:0;max-width:60ch}.guidance strong{color:var(--ink);font-weight:600}.working{animation:working 1.4s ease-out infinite}@keyframes working{50%{opacity:.45}}[hidden]{display:none!important}footer{max-width:1440px;margin:auto;padding:0 48px 26px;color:var(--muted);font-size:11px}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media(min-width:1500px){main{padding-top:58px}}@media(max-width:850px){header{padding:20px 24px}.brand span{display:none}main{padding:30px 24px}.workspace{grid-template-columns:1fr}.capture{border-right:0;border-bottom:1px solid var(--line)}.output{min-height:220px}.output-empty{padding-top:10px}.guidance{flex-direction:column;gap:12px}footer{padding:0 24px 24px}}@media(max-width:430px){header{padding:16px}.connection{gap:6px;font-size:11px}.link-button{font-size:11px;padding:3px}main{padding:25px 16px}.intro{font-size:14px;margin-bottom:24px}.panel-head,.options,.actions{padding-left:16px;padding-right:16px}.actions .small{width:100%;margin:0}.output,.translate-actions,.notice{padding-left:20px;padding-right:20px}.stage .empty{padding:16px}.empty p{margin-bottom:12px}.camera-icon{width:40px;height:40px;margin-bottom:10px}}
+/* Keep the working surface inside the viewport; long results scroll within their panel. */
+body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+header{width:100%;padding:14px 36px;flex-shrink:0}
+main{width:100%;flex:1;min-height:0;padding:18px 36px 20px;display:flex;flex-direction:column}
+h1{font-size:clamp(26px,2.5vw,34px);margin-bottom:6px}
+.intro{font-size:14px;margin-bottom:20px}
+.workspace{flex:1;min-height:0;box-shadow:none}
+.capture{display:flex;flex-direction:column}
+.panel-head{padding:12px 20px;min-height:50px;flex-shrink:0;border-bottom:1px solid var(--line)}
+.stage{flex:1;min-height:120px;aspect-ratio:auto}
+.options{height:52px;min-height:52px;padding:10px 20px;gap:16px;flex-shrink:0}
+.actions{height:68px;min-height:68px;padding:12px 20px;flex-shrink:0}
+.output{min-height:0;overflow:auto;scrollbar-color:#92a38e #f0f3eb;scrollbar-width:thin;padding:26px}
+.output-empty{padding-top:24px}
+.translation{min-height:0}
+.notice{height:52px;min-height:52px;display:flex;align-items:center;padding:8px 20px;font-size:11px;flex-shrink:0}
+.translate-actions{height:68px;min-height:68px;padding:12px 20px;margin:0;border-top:1px solid var(--line);flex-shrink:0}
+.status-row{margin-top:10px;min-height:0;flex-shrink:0}
+@media(max-width:1100px) and (min-width:851px){.workspace{grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr)}.options{gap:12px}.options .small,.actions .small{display:none}}
+@media(max-width:850px){
+ header{padding:10px 16px}main{padding:12px 16px 14px}
+ h1{font-size:26px}.intro{font-size:13px;margin-bottom:12px}
+ .workspace{display:flex;flex-direction:column;overflow:auto;scrollbar-width:thin}
+ .capture{flex-shrink:0;border-bottom:1px solid var(--line)}
+ .panel-head{min-height:42px;height:42px;padding:9px 16px}
+ .stage{height:clamp(160px,25dvh,250px);min-height:160px;flex:none}
+ .camera-icon{width:32px;height:32px;margin-bottom:8px}.empty strong{font-size:17px}
+ .empty p{display:none}.empty button{margin-top:14px;min-height:40px;padding:7px 14px}
+ .options{height:40px;min-height:40px;padding:7px 16px;gap:16px;font-size:12px}
+ .options .small,.actions .small{display:none}
+ .actions,.translate-actions{height:58px;min-height:58px;padding:7px 16px}
+ .translation{flex:1;min-height:220px;overflow:visible}
+ .output{padding:16px 20px;min-height:90px}.output-empty{padding-top:0}
+ .output-icon{display:none}.output h3{font-size:18px}.output p{font-size:12px;max-width:45ch}
+ .notice{height:auto;min-height:40px;padding:6px 16px;font-size:10px}
+ .english{font-size:21px}.result-meta{margin-top:10px;font-size:10px}
+ .status-row{font-size:12px;margin-top:8px}
+}
+@media(max-height:650px) and (min-width:851px){header{padding-top:8px;padding-bottom:8px}main{padding-top:10px;padding-bottom:12px}.intro{margin-bottom:12px}.output-empty{padding-top:0}.camera-icon{height:36px;margin-bottom:8px}.empty p{margin-bottom:12px}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/" aria-label="ASL workspace home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 20V13a2 2 0 0 1 4 0v4-10a2 2 0 0 1 4 0v9-11a2 2 0 0 1 4 0v11-8a2 2 0 0 1 4 0v11l3-3a2 2 0 0 1 3 3l-6 8a7 7 0 0 1-6 3h-2a8 8 0 0 1-8-8Z"/></svg>ASL<span>Signing workspace</span></a>
+  <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection">Checking Sol…</span><button class="link-button" id="reconnect">Check connection</button></div>
+</header>
+<main>
+  <h1>From signing to English.</h1>
+  <p class="intro">Record one sentence. Review the landmarks and translation, side by side.</p>
+  <div class="workspace">
+    <section class="capture" aria-labelledby="camera-title">
+      <div class="panel-head"><h2 id="camera-title">Camera &amp; landmarks</h2><span class="timer" id="timer">00:00 / 00:20</span></div>
+      <div class="stage" id="stage">
+        <video id="video" muted playsinline aria-label="Camera preview and recorded signing clip"></video>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+        <div class="empty" id="camera-empty">
+          <svg class="camera-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="12" width="27" height="25" rx="5"/><path d="m33 21 10-6v19l-10-6M15 8h10"/></svg>
+          <strong>Your camera is off</strong>
+          <p>Keep your face, hands and upper body in the frame. One signer at a time.</p>
+          <button id="enable">Enable camera</button>
+        </div>
+        <span class="stage-label" id="stage-label" hidden>Camera preview</span>
+      </div>
+      <div class="options"><label><input type="checkbox" id="landmarks" disabled checked>Show landmarks</label><label><input type="checkbox" id="mirror" checked>Mirror preview</label><span class="small" id="landmark-note">Available after translation</span></div>
+      <div class="actions">
+        <button class="primary" id="record" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg><span>Record clip</span></button>
+        <button id="reset" disabled>New clip</button>
+        <button class="link-button" id="release" hidden>Turn camera off</button>
+        <span class="small">20 seconds max · no audio</span>
+      </div>
+    </section>
+    <section class="translation" aria-labelledby="translation-title">
+      <div class="panel-head"><h2 id="translation-title">Translation</h2><span class="language">ASL to English</span></div>
+      <div class="output" aria-live="polite" aria-busy="false" id="output">
+        <div class="output-empty" id="output-empty"><svg class="output-icon" viewBox="0 0 36 36" aria-hidden="true"><path d="M7 8h22v16H17l-7 6v-6H7ZM13 14h10M13 19h6"/></svg><h3>Ready when you are.</h3><p>Your English translation will appear here after you record and submit a clip.</p></div>
+        <div class="english" id="english" hidden></div>
+        <div class="result-meta" id="result-meta" hidden></div>
+      </div>
+      <p class="notice">Experimental model. Translations may miss meaning. Review each result; model scores are not confidence ratings.</p>
+      <div class="translate-actions"><button class="primary" id="translate" disabled>Translate clip</button><button id="copy" disabled>Copy text</button></div>
+    </section>
+  </div>
+  <div class="status-row" id="status-row" hidden><span class="dot"></span><span id="status" role="status"></span></div>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const video = $("video"), canvas = $("overlay"), context = canvas.getContext("2d");
+const state = {stream:null, recorder:null, clip:null, url:null, ready:false, busy:false, opening:false, frames:[], width:0, height:0, timer:null, started:0, generation:0};
+const bodyEdges = [[0,1],[0,2],[1,3],[2,4],[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
+const handEdges = [];
+for (const base of [91,112]) for (let finger=0; finger<5; finger++) {
+  const first=base+1+finger*4; handEdges.push([base,first],[first,first+1],[first+1,first+2],[first+2,first+3]);
+}
+function message(text, error=false) { $("status").textContent=text; $("status-row").hidden=!text; $("status-row").classList.toggle("error",error); }
+function recording() { return state.recorder && state.recorder.state === "recording"; }
+function controls() {
+  const active=recording();
+  $("record").disabled=state.busy || state.opening || (!state.stream && !active) || !!state.clip;
+  $("record").querySelector("span").textContent=active ? "Stop recording" : "Record clip";
+  $("record").classList.toggle("danger",!!active);
+  $("reset").disabled=state.busy || active || state.opening || (!state.clip && !state.frames.length);
+  $("translate").disabled=state.busy || !state.clip || !state.ready;
+  $("translate").textContent=state.busy ? "Translating on Sol…" : "Translate clip";
+  $("output").setAttribute("aria-busy",String(state.busy));
+  $("translate").classList.toggle("working",state.busy);
+  $("enable").disabled=state.opening;
+  $("release").hidden=!state.stream || !!active;
+  $("landmarks").disabled=!state.frames.length;
+  $("copy").disabled=state.busy || !$("english").textContent;
+  $("stage").classList.toggle("preview",!state.clip);
+  $("stage").classList.toggle("mirror",$("mirror").checked);
+}
+function release() {
+  if (state.stream) state.stream.getTracks().forEach(track => track.stop());
+  state.stream=null; video.srcObject=null; controls();
+}
+function clearResult() {
+  state.frames=[]; $("english").textContent=""; $("english").hidden=true;
+  $("result-meta").hidden=true; $("output-empty").hidden=false;
+  $("landmark-note").textContent="Available after translation";
+  context.clearRect(0,0,canvas.width,canvas.height);
+}
+function reset() {
+  state.generation++; release(); video.pause(); video.removeAttribute("src"); video.load();
+  if (state.url) URL.revokeObjectURL(state.url);
+  state.url=null; state.clip=null; state.recorder=null; video.controls=false;
+  clearResult(); $("camera-empty").hidden=false; $("stage-label").hidden=true;
+  $("timer").textContent="00:00 / 00:20"; controls();
+  message("");
+}
+async function enable() {
+  if (state.opening || state.busy) return;
+  state.opening=true; controls();
+  const generation=state.generation;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error("Use a current Chrome, Edge, Firefox or Safari browser at localhost to record.");
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:30,max:30}},audio:false});
+    if (generation !== state.generation) { stream.getTracks().forEach(track=>track.stop()); return; }
+    state.stream=stream; video.srcObject=stream; video.controls=false; await video.play();
+    $("camera-empty").hidden=true; $("stage-label").hidden=false; $("stage-label").textContent="Camera preview";
+    stream.getVideoTracks()[0].addEventListener("ended",()=>{
+      if (recording()) state.recorder.stop();
+      else { release(); $("camera-empty").hidden=false; $("stage-label").hidden=true; message("Camera disconnected. Reconnect it and enable the camera again.",true); }
+    });
+    message("Camera ready. Record one complete sentence, then stop.");
+  } catch (error) {
+    release();
+    const messages={NotAllowedError:"Camera access was denied. Allow camera access in your browser, then try again.",NotFoundError:"No camera found. Connect a camera, then try again.",NotReadableError:"Camera is busy. Close other camera apps, then try again."};
+    message(messages[error.name] || error.message || "Camera could not start. Check browser permissions and try again.",true);
+  } finally { state.opening=false; controls(); }
+}
+function tick() {
+  const elapsed=Math.min(20,Math.floor((performance.now()-state.started)/1000));
+  $("timer").textContent=`00:${String(elapsed).padStart(2,"0")} / 00:20`;
+  if (elapsed>=20 && recording()) state.recorder.stop();
+}
+function record() {
+  if (recording()) { state.recorder.stop(); return; }
+  if (!state.stream || state.busy || state.clip) return;
+  try {
+    const mime=["video/webm;codecs=vp8","video/webm","video/mp4"].find(type=>MediaRecorder.isTypeSupported(type));
+    if (!mime) throw new Error("This browser cannot record a supported video format. Try Chrome or Edge.");
+    clearResult(); const chunks=[]; let bytes=0, failed=false;
+    const recorder=new MediaRecorder(state.stream,{mimeType:mime,videoBitsPerSecond:1500000});
+    state.recorder=recorder;
+    recorder.ondataavailable=event=>{
+      if (event.data.size) { chunks.push(event.data); bytes+=event.data.size; }
+      if (bytes>16*1024*1024) { failed=true; if (recording()) recorder.stop(); }
+    };
+    recorder.onerror=()=>{ failed=true; message("Recording failed. Start a new clip and try again.",true); if (recording()) recorder.stop(); };
+    recorder.onstop=()=>{
+      clearInterval(state.timer); state.timer=null; tick(); release();
+      $("stage-label").classList.remove("recording");
+      if (failed || !bytes) { reset(); message("Recording failed or exceeded 16 MiB. Try a shorter clip.",true); return; }
+      state.clip=new Blob(chunks,{type:recorder.mimeType}); state.url=URL.createObjectURL(state.clip);
+      video.src=state.url; video.controls=true; video.load();
+      $("stage-label").textContent="Recorded clip";
+      message(state.ready ? "Clip ready. Play it back or choose Translate clip." : "Clip ready for review. Connect a Sol workspace to translate it."); controls();
+    };
+    recorder.start(250); state.started=performance.now(); state.timer=setInterval(tick,100);
+    $("stage-label").textContent="Recording"; $("stage-label").classList.add("recording");
+    message("Recording. Sign one sentence, then choose Stop recording."); controls();
+  } catch (error) { message(error.message || "Could not start recording. Try enabling the camera again.",true); controls(); }
+}
+async function checkConnection() {
+  $("reconnect").disabled=true;
+  try {
+    const response=await fetch("/api/status",{signal:AbortSignal.timeout(5000)});
+    if (!response.ok) throw new Error("Unavailable");
+    const data=await response.json(); state.ready=data.ready===true;
+    $("connection").textContent=state.ready ? "Sol connected" : "Local preview";
+    if (!state.ready && state.clip) message("Clip ready for review. Open a configured Sol workspace to translate.");
+  } catch { state.ready=false; $("connection").textContent="Server unavailable"; message("Workspace server is unavailable. Restart it, then check the connection.",true); }
+  finally { $("connection-dot").classList.toggle("online",state.ready); $("reconnect").disabled=false; controls(); }
+}
+function validateResult(data) {
+  const pose=data.landmarks;
+  if (typeof data.english!=="string" || typeof data.model_id!=="string" || typeof data.model_version!=="string" || !Number.isFinite(data.latency_ms) || data.latency_ms<0 || !pose || !Number.isFinite(pose.width) || pose.width<=0 || !Number.isFinite(pose.height) || pose.height<=0 || !Array.isArray(pose.frames) || !pose.frames.length || pose.frames.length>1000) throw new Error("Sol returned an invalid result. Check the runtime and retry.");
+  let previous=-1;
+  for (const frame of pose.frames) {
+    if (!Number.isFinite(frame.timestamp_ms) || frame.timestamp_ms<=previous || !Array.isArray(frame.coordinates) || frame.coordinates.length!==133 || !Array.isArray(frame.presence) || frame.presence.length!==133 || frame.presence.some(value=>typeof value!=="boolean") || frame.coordinates.some(point=>!Array.isArray(point) || point.length!==2 || point.some(value=>!Number.isFinite(value)))) throw new Error("Sol returned invalid landmark frames. Check the runtime and retry.");
+    previous=frame.timestamp_ms;
+  }
+  return data;
+}
+async function translate() {
+  if (!state.clip || !state.ready || state.busy) return;
+  state.busy=true; clearResult(); controls();
+  message("Processing on Sol. Extracting landmarks and translating; this can take several minutes.");
+  try {
+    const response=await fetch("/api/translate",{method:"POST",headers:{"Content-Type":state.clip.type,"X-ASL-Request":"clip"},body:state.clip,signal:AbortSignal.timeout(660000)});
+    const data=await response.json(); if (!response.ok) throw new Error(data.error || "Translation failed. Try again.");
+    validateResult(data); state.frames=data.landmarks.frames; state.width=data.landmarks.width; state.height=data.landmarks.height;
+    canvas.width=state.width; canvas.height=state.height;
+    $("output-empty").hidden=true; $("english").hidden=false;
+    $("english").textContent=data.english.trim() || "The model returned no English text.";
+    $("result-meta").textContent=`${data.model_id} · ${data.model_version} · ${(data.latency_ms/1000).toFixed(1)} s decoding`;
+    $("result-meta").hidden=false; $("landmark-note").textContent=`${state.frames.length} sampled frames · 133 points`;
+    video.currentTime=0; draw(); message("Translation ready. Play the clip to review actual MMPose landmarks. Check the English for meaning.");
+  } catch (error) { message(error.name==="TimeoutError" ? "Request timed out. Check the Sol session before retrying." : error.message || "Connection lost. Check Sol, then retry this clip.",true); }
+  finally { state.busy=false; controls(); }
+}
+function draw() {
+  context.clearRect(0,0,canvas.width,canvas.height);
+  if (!state.frames.length || !$("landmarks").checked) return;
+  const time=video.currentTime*1000;
+  let frame=state.frames[0];
+  for (const candidate of state.frames) { if (candidate.timestamp_ms>time) break; frame=candidate; }
+  const {coordinates:points,presence}=frame;
+  context.lineWidth=1.6;
+  for (const [a,b] of [...bodyEdges,...handEdges]) {
+    if (!presence[a] || !presence[b]) continue;
+    context.strokeStyle=a>=91 ? "#a5f598" : "#f5c96e";
+    context.beginPath(); context.moveTo(...points[a]); context.lineTo(...points[b]); context.stroke();
+  }
+  points.forEach(([x,y],index)=>{ if (!presence[index]) return; context.fillStyle=index>=91 ? "#b9ffac" : "#f5d994"; context.beginPath(); context.arc(x,y,index>=91 ? 2.1 : 1.3,0,Math.PI*2); context.fill(); });
+}
+$("enable").onclick=enable; $("release").onclick=()=>{release();$("camera-empty").hidden=false;$("stage-label").hidden=true;message("Camera is off. Enable it when you are ready.");};
+$("record").onclick=record; $("reset").onclick=reset; $("translate").onclick=translate;
+$("reconnect").onclick=checkConnection; $("mirror").onchange=controls; $("landmarks").onchange=draw;
+$("copy").onclick=async()=>{try{await navigator.clipboard.writeText($("english").textContent);message("Translation copied.");}catch{message("Clipboard unavailable. Select the translation text and copy it manually.",true);}};
+video.addEventListener("timeupdate",draw); video.addEventListener("seeked",draw); video.addEventListener("loadeddata",draw);
+function animateOverlay() { if (!video.paused) draw(); requestAnimationFrame(animateOverlay); }
+requestAnimationFrame(animateOverlay);
+window.addEventListener("pagehide",()=>{state.generation++;clearInterval(state.timer);if(recording()) {state.recorder.onstop=null;state.recorder.stop();}release();if(state.url)URL.revokeObjectURL(state.url);});
+checkConnection(); controls();
+</script>
+</body>
+</html>
