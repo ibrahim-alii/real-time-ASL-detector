@@ -140,7 +140,7 @@ def main() -> None:
     parser.add_argument('mode', choices=('probe', 'batch'))
     parser.add_argument('--round-dir', type=Path, required=True)
     parser.add_argument('--video-limit', type=int, default=500)
-    parser.add_argument('--workers', type=int, choices=(1, 2, 3, 4), default=1)
+    parser.add_argument('--workers', type=int, choices=(1, 2, 3, 4, 10), default=1)
     parser.add_argument('--byte-limit', type=int, default=256 * 1024**3)
     parser.add_argument('--previous-report', type=Path)
     parser.add_argument('--probe-report', type=Path,
