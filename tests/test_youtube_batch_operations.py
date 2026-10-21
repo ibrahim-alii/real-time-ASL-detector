@@ -198,8 +198,9 @@ def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize('previous_status', ['completed', 'failed'])
+@pytest.mark.parametrize('workers', [3, 4])
 def test_large_batch_parameters_and_failed_predecessor_guard(
-    tmp_path, monkeypatch, previous_status
+    tmp_path, monkeypatch, previous_status, workers
 ):  # type: ignore[no-untyped-def]
     batch = load_batch()
     run, scratch = tmp_path / 'remote', tmp_path / 'scratch'
@@ -221,7 +222,7 @@ def test_large_batch_parameters_and_failed_predecessor_guard(
         'videos': {'one': {'availability': 'available', 'split': 'train', 'attempts': 1}}})
     monkeypatch.setattr(batch, 'acquire_youtube', acquire)
     monkeypatch.setattr(sys, 'argv', ['batch', 'batch', '--round-dir', str(directory),
-                                    '--workers', '3',
+                                    '--workers', str(workers),
                                     '--previous-report', str(run / 'previous.json')])
     if previous_status == 'failed':
         with pytest.raises(RuntimeError, match='predecessor'):
@@ -231,7 +232,7 @@ def test_large_batch_parameters_and_failed_predecessor_guard(
         batch.main()
         assert acquire.call_args.kwargs['video_limit'] == 500
         assert acquire.call_args.kwargs['byte_limit'] == 256 * 1024**3
-        assert acquire.call_args.kwargs['workers'] == 3
+        assert acquire.call_args.kwargs['workers'] == workers
         report = json.loads((directory / 'batch-report.json').read_text())
         assert report['batch_progress']['acquired_pairs'] == 1
 
