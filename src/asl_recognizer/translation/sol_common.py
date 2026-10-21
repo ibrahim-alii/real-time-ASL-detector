@@ -47,6 +47,27 @@ def tree_bytes(root: Path) -> int:
     raise RuntimeError("storage scan did not complete")
 
 
+def scan_tree_bytes(root: Path) -> int:
+    """Count the same file bytes with cached directory-entry metadata and no dir symlinks."""
+    def size(directory: Path) -> int:
+        total = 0
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    total += size(Path(entry.path))
+                elif entry.is_file():
+                    total += entry.stat().st_size
+        return total
+
+    for attempt in range(3):
+        try:
+            return size(root)
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
+    raise RuntimeError("storage scan did not complete")
+
+
 def capacity(
     path: Path, required: int, *, remaining_quota: int, margin: float = 0.3
 ) -> dict[str, int]:
