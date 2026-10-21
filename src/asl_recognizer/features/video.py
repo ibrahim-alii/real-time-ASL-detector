@@ -75,8 +75,17 @@ def iter_every_other_video_frame(
     path: Path, *, start_ms: int, end_ms: int
 ) -> Iterator[tuple[npt.NDArray[np.uint8], int]]:
     """Decode incrementally; closing the iterator also releases the video handle."""
+    yield from iter_video_frames(path, start_ms=start_ms, end_ms=end_ms, frame_stride=2)
+
+
+def iter_video_frames(
+    path: Path, *, start_ms: int, end_ms: int, frame_stride: int = 1
+) -> Iterator[tuple[npt.NDArray[np.uint8], int]]:
+    """Yield native frames with bounded image memory and an explicit sampling stride."""
     if start_ms < 0 or end_ms <= start_ms:
         raise ValueError("video segment timing is invalid")
+    if frame_stride < 1:
+        raise ValueError("frame stride must be positive")
     try:
         import cv2
     except ImportError as error:
@@ -98,7 +107,7 @@ def iter_every_other_video_frame(
             ok, frame = capture.read()
             if not ok:
                 raise ValueError(f"unable to decode frame {index}: {path.name}")
-            if (index - first) % 2 == 0:
+            if (index - first) % frame_stride == 0:
                 yield cast(npt.NDArray[np.uint8], frame), round(index * 1000 / fps)
     finally:
         capture.release()
