@@ -33,3 +33,44 @@
 - [ ] Expand data and training only after review and resource checks pass.
 - [ ] Define measurable quality targets from the dev baseline before final test evaluation.
 - [ ] Finalize the chosen model, evaluate held-out test clips and report results and limitations.
+
+## Camera workspace
+
+- [x] Browser camera preview, silent clips up to 20 seconds, playback and English output.
+- [x] Actual 133-point MMPose landmarks synchronized with recorded playback after inference.
+- [x] Compact desktop/mobile layout, permission errors, single inference writer and temporary-file cleanup.
+- [ ] Verify the browser-to-model workflow against a live Sol GPU allocation; model quality remains unverified.
+
+Start camera-only preview from the checkout with the project's Python environment:
+
+```powershell
+.venv/Scripts/python.exe scripts/workspace_server.py
+```
+
+Open [the local workspace](http://127.0.0.1:8765). No inference or model downloads run on the laptop.
+Recording stays in browser memory; translation sends the clip to the workspace server.
+
+For translation, run the server inside a Sol GPU allocation with `--runtime-config /path/to/private.json`.
+Keep this configuration outside version control. It must name existing absolute Sol paths:
+
+```json
+{
+  "python": "/path/to/translation-environment/bin/python",
+  "extraction_python": "/path/to/mmpose-environment/bin/python",
+  "checkpoint": "/path/to/selected-checkpoint.pt",
+  "pose_config": "/path/to/pose-config.py",
+  "pose_weights": "/path/to/pose-weights.pth",
+  "detector_config": "/path/to/detector-config.py",
+  "detector_weights": "/path/to/detector-weights.pth",
+  "work_root": "/scratch/your-user/existing-session-directory"
+}
+```
+
+The server environment needs OpenCV and `ffmpeg` with H.264 support. Use this updated source on Sol;
+the extractor and checkpoint identities must match. Forward local port 8765 to the allocated node's
+loopback port 8765 through your configured SSH jump host, then open the local URL above.
+The server is loopback-only. Match local and remote port numbers; uploads are capped at 16 MiB,
+processing at ten minutes. Session media and caches are removed after processing.
+
+Run synthetic workspace checks with `python -m pytest tests/test_workspace.py -q`.
+The JavaScript contract check uses Node when available. These tests need no camera, dataset or weights.
