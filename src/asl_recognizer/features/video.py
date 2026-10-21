@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -24,7 +25,7 @@ def sampled_video_segment(
     """Sample a time-bounded video segment without forcing a fixed sequence length."""
     if start_ms < 0 or end_ms <= start_ms:
         raise ValueError("video segment timing is invalid")
-    if sample_rate_hz <= 0:
+    if not np.isfinite(sample_rate_hz) or sample_rate_hz <= 0:
         raise ValueError("sample_rate_hz must be positive")
     try:
         import cv2
@@ -36,14 +37,14 @@ def sampled_video_segment(
             raise ValueError(f"unable to open video: {path.name}")
         frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = float(capture.get(cv2.CAP_PROP_FPS))
-        if frame_count <= 0 or fps <= 0:
+        if frame_count <= 0 or not np.isfinite(fps) or fps <= 0:
             raise ValueError(f"invalid video metadata: {path.name}")
-        video_end_ms = (frame_count - 1) * 1000.0 / fps
+        video_end_ms = frame_count * 1000.0 / fps
         bounded_end = min(float(end_ms), video_end_ms)
         if bounded_end <= start_ms:
             raise ValueError(f"video segment lies outside {path.name}")
         interval_ms = 1000.0 / sample_rate_hz
-        target_times = np.arange(float(start_ms), bounded_end + interval_ms / 2, interval_ms)
+        target_times = np.arange(float(start_ms), bounded_end, interval_ms)
         frames: list[tuple[npt.NDArray[np.uint8], int]] = []
         previous_timestamp = start_ms - 1
         for target_ms in target_times:
@@ -52,9 +53,11 @@ def sampled_video_segment(
             if not ok:
                 continue
             actual_ms = float(capture.get(cv2.CAP_PROP_POS_MSEC))
-            timestamp = round(actual_ms if actual_ms >= 0 else target_ms)
-            if timestamp <= previous_timestamp:
-                timestamp = max(round(float(target_ms)), previous_timestamp + 1)
+            if not np.isfinite(actual_ms) or not start_ms <= actual_ms < bounded_end:
+                continue
+            timestamp = round(actual_ms)
+            if timestamp <= previous_timestamp or timestamp >= end_ms:
+                continue
             frames.append((cast(npt.NDArray[np.uint8], frame), timestamp))
             previous_timestamp = timestamp
         return VideoSample(tuple(frames), len(target_times))
@@ -64,6 +67,14 @@ def sampled_video_segment(
 
 def every_other_video_frame(path: Path, *, start_ms: int, end_ms: int) -> VideoSample:
     """Decode every second native frame within a caption's half-open time span."""
+    frames = tuple(iter_every_other_video_frame(path, start_ms=start_ms, end_ms=end_ms))
+    return VideoSample(frames, len(frames))
+
+
+def iter_every_other_video_frame(
+    path: Path, *, start_ms: int, end_ms: int
+) -> Iterator[tuple[npt.NDArray[np.uint8], int]]:
+    """Decode incrementally; closing the iterator also releases the video handle."""
     if start_ms < 0 or end_ms <= start_ms:
         raise ValueError("video segment timing is invalid")
     try:
@@ -76,20 +87,18 @@ def every_other_video_frame(path: Path, *, start_ms: int, end_ms: int) -> VideoS
             raise ValueError(f"unable to open video: {path.name}")
         count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = float(capture.get(cv2.CAP_PROP_FPS))
-        if count <= 0 or fps <= 0:
+        if count <= 0 or not np.isfinite(fps) or fps <= 0:
             raise ValueError(f"invalid video metadata: {path.name}")
         first = max(0, int(np.ceil(start_ms * fps / 1000)))
         stop = min(count, int(np.ceil(end_ms * fps / 1000)))
         if stop <= first:
             raise ValueError(f"video segment lies outside {path.name}")
-        frames: list[tuple[npt.NDArray[np.uint8], int]] = []
         capture.set(cv2.CAP_PROP_POS_FRAMES, first)
         for index in range(first, stop):
             ok, frame = capture.read()
             if not ok:
                 raise ValueError(f"unable to decode frame {index}: {path.name}")
             if (index - first) % 2 == 0:
-                frames.append((cast(npt.NDArray[np.uint8], frame), round(index * 1000 / fps)))
-        return VideoSample(tuple(frames), len(range(first, stop, 2)))
+                yield cast(npt.NDArray[np.uint8], frame), round(index * 1000 / fps)
     finally:
         capture.release()
