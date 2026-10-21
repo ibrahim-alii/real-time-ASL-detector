@@ -36,7 +36,14 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def tree_bytes(root: Path) -> int:
-    return sum(p.stat().st_size for p in root.rglob("*") if p.is_file())
+    for attempt in range(3):
+        try:
+            return sum(p.stat().st_size for p in root.rglob("*") if p.is_file())
+        except FileNotFoundError:
+            # Atomic publishers may rename a temporary file during this scan.
+            if attempt == 2:
+                raise
+    raise RuntimeError("storage scan did not complete")
 
 
 def capacity(
