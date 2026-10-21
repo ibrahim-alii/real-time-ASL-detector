@@ -5,6 +5,7 @@ import argparse
 import csv
 import getpass
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -13,9 +14,11 @@ from collections import Counter
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 from asl_recognizer.translation.acquisition import acquire_youtube, acquisition_failure_kind
 from asl_recognizer.translation.sol_common import read_json, write_json, writer_lock
+from asl_recognizer.translation.youtube import file_hash
 
 RUN = Path(os.environ.get('ASL_RUN_ROOT', str(Path.home() / 'asl-translation/run')))
 SCRATCH = Path(os.environ.get('ASL_SCRATCH_ROOT',
@@ -183,25 +186,32 @@ def main() -> None:
     official = SCRATCH / 'youtube-asl/official-ids.txt'
     if not COOKIE.is_file() or COOKIE.stat().st_mode & 0o077:
         raise RuntimeError('cookie file must exist with owner-only permissions')
+    probe_identity = {'version': 1, 'cookie_sha256': file_hash(COOKIE),
+                      'official_ids_sha256': file_hash(official)}
     if args.mode == 'probe':
         video_id = 'P-D0kEmncGw'
         if video_id not in official.read_text().splitlines():
             raise ValueError('probe is not in official dataset')
-        root = SCRATCH / 'youtube-auth-mp4-probe-20261018'
-        root.mkdir(parents=True, exist_ok=True)
+        root = SCRATCH / ('youtube-auth-probe-' + uuid4().hex)
+        root.mkdir(parents=True, mode=0o700, exist_ok=False)
         ids = root / 'official-ids.txt'
         ids.write_text(video_id + '\n')
         byte_limit, video_limit, attempts = 512 * 1024**2, 1, 1
     else:
         probe = read_json(args.probe_report)
-        if probe['status'] != 'completed' or probe.get('available', 0) != 1:
-            raise RuntimeError('successful one-video probe is required')
+        completed = probe.get('completed_at_unix')
+        if (probe.get('status') != 'completed' or probe.get('mode') != 'probe'
+                or probe.get('available') != 1 or probe.get('probe_identity') != probe_identity
+                or probe.get('batch_progress', {}).get('acquired_pairs') != 1
+                or not isinstance(completed, (int, float)) or not math.isfinite(completed)
+                or not 0 <= time.time() - completed <= 3600):
+            raise RuntimeError('fresh probe for current cookies and official sources required')
         root = SCRATCH / 'youtube-asl'
         ids = official
         byte_limit, video_limit, attempts = args.byte_limit, args.video_limit, 3
     report = {'status': 'running', 'mode': args.mode, 'video_limit': video_limit,
               'byte_limit': byte_limit, 'workers': args.workers,
-              'root': str(root), 'training_started': False}
+              'root': str(root), 'training_started': False, 'probe_identity': probe_identity}
     destination = directory / f'{args.mode}-report.json'
     write_json(destination, report)
     started = time.monotonic()
@@ -222,7 +232,7 @@ def main() -> None:
                                         if os.environ.get('ASL_BEEGFS_QUOTA_HOST')
                                         else 'project-du'))
         write_json(destination, report)
-        with writer_lock(root / 'acquisition.lock'):
+        with writer_lock(SCRATCH / 'youtube-asl/acquisition.lock'):
             ledger_path = root / 'acquisition.json'
             before = read_json(ledger_path) if ledger_path.exists() else {'videos': {}}
             batch_started = time.monotonic()
@@ -241,8 +251,13 @@ def main() -> None:
         report.update(status='completed',
                       **coverage(ledger, ids.read_text().splitlines(), attempts),
                       outcomes=dict(Counter(v['availability'] for v in ledger['videos'].values())))
-        if args.mode == 'probe' and report['available'] != 1:
-            raise RuntimeError('one-video probe did not acquire a usable pair')
+        if args.mode == 'probe' and (
+            report['available'] != 1 or report['batch_progress']['acquired_pairs'] != 1
+            or file_hash(COOKIE) != probe_identity['cookie_sha256']
+            or file_hash(official) != probe_identity['official_ids_sha256']
+        ):
+            raise RuntimeError('one-video probe did not acquire a fresh pair with current identity')
+        report['completed_at_unix'] = time.time()
     except Exception as error:
         report.update(status='failed', error=str(error))
         raise
