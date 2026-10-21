@@ -333,8 +333,8 @@ def acquire_youtube(
     workers: int = 1,
 ) -> dict[str, Any]:
     """Acquire another deterministic batch; resume verifies both video and caption files."""
-    if not 1 <= workers <= 3:
-        raise ValueError("workers must be between 1 and 3")
+    if not 1 <= workers <= 4:
+        raise ValueError("workers must be between 1 and 4")
     root.mkdir(parents=True, exist_ok=True)
     ledger_path = root / "acquisition.json"
     identity = {
