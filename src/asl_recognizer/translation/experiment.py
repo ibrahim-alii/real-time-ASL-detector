@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import random
 import time
 from dataclasses import asdict, dataclass
@@ -71,8 +72,25 @@ class ExperimentConfig:
 def atomic_checkpoint(payload: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
-    torch.save(payload, temporary)
+    with temporary.open("wb") as handle:
+        torch.save(payload, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
     temporary.replace(path)
+
+
+def selected_checkpoint(run: Path, state: dict[str, Any], source: str) -> Path:
+    """Resolve the immutable selection committed by this resume state."""
+    selection = state.get("best_checkpoints", {}).get(source)
+    if selection is None:
+        return run / f"best-{source}.pt"
+    name = selection["file"]
+    if not isinstance(name, str) or Path(name).name != name:
+        raise ValueError("invalid selected checkpoint reference")
+    path = run / name
+    if file_hash(path) != selection["sha256"]:
+        raise ValueError("selected checkpoint checksum mismatch")
+    return path
 
 
 def checkpoint_model_config(saved: dict[str, Any]) -> DirectTranslationConfig:
@@ -154,6 +172,7 @@ def run_experiment(
     job_steps: int | None = None,
     device_name: str | None = None,
     wall_time_seconds: float | None = None,
+    strict_deadline: bool = False,
 ) -> None:
     """Steps count optimizer updates, never individual accumulation microbatches."""
     from transformers import AutoTokenizer
@@ -183,11 +202,9 @@ def run_experiment(
     for manifest, _, _ in loaded.values():
         if manifest.accepted("unassigned"):
             raise ValueError("local experiments require assigned splits")
-        train_videos = {row.video_id for row in manifest.accepted("train")}
-        heldout_videos = {
-            row.video_id for row in manifest.accepted() if row.split in {"dev", "test"}
-        }
-        if train_videos & heldout_videos:
+        groups = [{row.video_id for row in manifest.accepted(split)}
+                  for split in ("train", "dev", "test")]
+        if any(groups[i] & groups[j] for i in range(3) for j in range(i + 1, 3)):
             raise ValueError("source recording spans train and held-out splits")
     hashes = {source: item[0].fingerprint for source, item in loaded.items()}
     run_config = {
@@ -197,6 +214,7 @@ def run_experiment(
         "extractor": identity,
         "beam_width": 5,
         "decoder_tokens": 128,
+        "loss_normalization": "valid-target-tokens-v1",
     }
     device = torch.device(device_name or ("cuda:0" if torch.cuda.is_available() else "cpu"))
     if device.type == "cpu" and config.precision != "fp32":
@@ -239,6 +257,7 @@ def run_experiment(
         "source_timings": {},
         "checkpoint_seconds_max": 0.0,
         "peak_vram_bytes": 0,
+        "best_checkpoints": {},
     }
     latest = output / "latest.pt"
     if latest.exists():
@@ -247,6 +266,10 @@ def run_experiment(
             raise ValueError("resume identity differs from the saved experiment")
         if state["status"] == "completed":
             return
+        for source in state.get("best_checkpoints", {}):
+            selected = torch.load(selected_checkpoint(output, state, source),
+                                  map_location="cpu", weights_only=True)
+            atomic_checkpoint(selected, output / f"best-{source}.pt")
         model.load_state_dict(state["model"])
         optimizer.load_state_dict(state["optimizer"])
         scaler.load_state_dict(state["scaler"])
@@ -296,7 +319,7 @@ def run_experiment(
             state.get("checkpoint_seconds_max", 0.0), time.monotonic() - started
         )
 
-    def save() -> None:
+    def save(selection_source: str | None = None) -> None:
         state.update(
             model=model.state_dict(),
             optimizer=optimizer.state_dict(),
@@ -306,6 +329,14 @@ def run_experiment(
             torch_rng=torch.get_rng_state(),
             cuda_rng=torch.cuda.get_rng_state(device) if device.type == "cuda" else None,
         )
+        if selection_source is not None:
+            # The resume pointer advances only after both selection files exist.
+            path = output / f"selected-{selection_source}-{state['global_step']:09d}.pt"
+            write_checkpoint(path)
+            state.setdefault("best_checkpoints", {})[selection_source] = {
+                "file": path.name, "sha256": file_hash(path),
+            }
+            write_checkpoint(output / f"best-{selection_source}.pt")
         write_checkpoint(latest)
         summary = {
             key: value
@@ -333,21 +364,40 @@ def run_experiment(
         source, maximum = phases[phase]
         examples = loaded[source][1]
         cache = TranslationFeatureCache(features / source)
+        if strict_deadline and wall_time_seconds is not None:
+            timing = state.get("source_timings", {}).get(source, {})
+            reserve = state.get("checkpoint_seconds_max", 0.0)
+            reserve += timing.get("optimizer_seconds_max", 0.0)
+            if (state["phase_step"] + 1) % config.validation_interval == 0:
+                reserve += timing.get("validation_seconds_max", 0.0)
+            if time.monotonic() - allocation_started + reserve >= wall_time_seconds:
+                save()
+                return
         if source not in state["initial_dev"]:
             state["initial_dev"][source] = evaluate_dev(source)
             state["best_bleu"] = state["initial_dev"][source]["bleu"]
-            save()
-            write_checkpoint(output / f"best-{source}.pt")
+            save(source)
+            if (strict_deadline and wall_time_seconds is not None
+                    and time.monotonic() - allocation_started >= wall_time_seconds):
+                return
         model.train()
         started = time.perf_counter()
         optimizer.zero_grad(set_to_none=True)
         indices = rng.integers(0, len(examples), size=config.batch_size)
+        selected = [examples[int(index)] for index in indices]
+        all_values, all_attention, all_labels = _batch(
+            selected, cache, tokenizer, torch.device("cpu"), config.input_encoding
+        )
+        total_tokens = int(all_labels.ne(-100).sum())
+        if total_tokens == 0:
+            raise ValueError("training batch has no target tokens")
         mean_loss = 0.0
         for begin in range(0, config.batch_size, config.microbatch_size):
-            selected = [examples[int(i)] for i in indices[begin : begin + config.microbatch_size]]
-            values, attention, labels = _batch(
-                selected, cache, tokenizer, device, config.input_encoding
-            )
+            stop = begin + config.microbatch_size
+            labels = all_labels[begin:stop].to(device)
+            weight = int(all_labels[begin:stop].ne(-100).sum()) / total_tokens
+            values = all_values[begin:stop].to(device)
+            attention = all_attention[begin:stop].to(device)
             with torch.autocast(
                 device_type=device.type,
                 dtype=torch.float16 if config.precision == "fp16" else torch.bfloat16,
@@ -356,8 +406,8 @@ def run_experiment(
                 loss = model(values, attention, labels)
             if not torch.isfinite(loss):
                 raise RuntimeError("non-finite training loss; checkpoint not advanced")
-            mean_loss += float(loss.detach().cpu()) * len(selected) / config.batch_size
-            scaler.scale(loss * len(selected) / config.batch_size).backward()
+            mean_loss += float(loss.detach().cpu()) * weight
+            scaler.scale(loss * weight).backward()
         scaler.unscale_(optimizer)
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         if not torch.isfinite(norm):
@@ -374,6 +424,7 @@ def run_experiment(
         timing = state.setdefault("source_timings", {}).setdefault(source, {})
         timing["optimizer_seconds"] = timing.get("optimizer_seconds", 0.0) + elapsed
         timing["optimizer_updates"] = timing.get("optimizer_updates", 0) + 1
+        timing["optimizer_seconds_max"] = max(timing.get("optimizer_seconds_max", 0.0), elapsed)
         state["global_step"] += 1
         state["phase_step"] += 1
         state["train_loss"] = mean_loss
@@ -387,15 +438,15 @@ def run_experiment(
             if state["best_bleu"] is None or result["bleu"] > state["best_bleu"]:
                 state["best_bleu"] = result["bleu"]
                 state["bad_evaluations"] = 0
-                save()
-                write_checkpoint(output / f"best-{source}.pt")
+                save(source)
             else:
                 state["bad_evaluations"] += 1
             end_phase = end_phase or state["bad_evaluations"] >= config.early_stopping_patience
         if end_phase:
             # Start fine-tuning from the selected YouTube checkpoint, with fresh
             # optimizer moments. Its optimizer state is not a resumable phase state.
-            best = torch.load(output / f"best-{source}.pt", map_location="cpu", weights_only=True)
+            best = torch.load(selected_checkpoint(output, state, source),
+                              map_location="cpu", weights_only=True)
             model.load_state_dict(best["model"])
             state["selected_step"] = best["global_step"]
             state["selected_bleu"] = best["best_bleu"]
@@ -427,7 +478,8 @@ def finalize_experiment(run: Path, output: Path) -> None:
     latest = torch.load(run / "latest.pt", map_location="cpu", weights_only=True)
     if latest.get("mode") != "experiment" or latest.get("status") != "completed":
         raise ValueError("only a completed, dev-selected experiment can be finalized")
-    selected = torch.load(run / "best-how2sign.pt", map_location="cpu", weights_only=True)
+    selected_path = selected_checkpoint(run, latest, "how2sign")
+    selected = torch.load(selected_path, map_location="cpu", weights_only=True)
     if (
         selected["config"] != latest["config"]
         or selected["manifest_hashes"] != latest["manifest_hashes"]
@@ -439,6 +491,6 @@ def finalize_experiment(run: Path, output: Path) -> None:
         if key not in {"optimizer", "scaler", "numpy_rng", "python_rng", "torch_rng", "cuda_rng"}
     }
     selected.update(
-        status="finalized", selected_checkpoint_sha256=file_hash(run / "best-how2sign.pt")
+        status="finalized", selected_checkpoint_sha256=file_hash(selected_path)
     )
     atomic_checkpoint(selected, output)
