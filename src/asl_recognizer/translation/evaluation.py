@@ -140,6 +140,8 @@ def evaluate_checkpoint(
         }
         if schema == MMPOSE_SCHEMA:
             expected["extractor"] = saved["config"]["extractor"]
+        if saved["config"].get("preprocessing") is not None:
+            expected["preprocessing"] = saved["config"]["preprocessing"]
         artifact = cache.find_valid(
             record.clip_id,
             expected_metadata=expected,
