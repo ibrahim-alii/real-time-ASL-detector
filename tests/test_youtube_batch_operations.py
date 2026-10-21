@@ -168,7 +168,7 @@ def test_cookie_help_link_does_not_override_actual_failure(
     assert 'SECRET_VALUE' not in str(failure.value)
 
 
-@pytest.mark.parametrize('workers', [3, 10])
+@pytest.mark.parametrize('workers', [3, 10, 20])
 def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path, workers: int) -> None:
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
@@ -199,7 +199,7 @@ def test_concurrent_commands_isolate_and_remove_cookie_jars(tmp_path: Path, work
 
 
 @pytest.mark.parametrize('previous_status', ['completed', 'failed'])
-@pytest.mark.parametrize('workers', [3, 4, 10])
+@pytest.mark.parametrize('workers', [3, 4, 10, 20])
 def test_large_batch_parameters_and_failed_predecessor_guard(
     tmp_path, monkeypatch, previous_status, workers
 ):  # type: ignore[no-untyped-def]
