@@ -105,6 +105,24 @@ def checkpoint_model_config(saved: dict[str, Any]) -> DirectTranslationConfig:
     )
 
 
+def preprocessing_contract(paths: dict[str, Path], features: Path) -> dict[str, Any] | None:
+    """Require one input contract across training and development, without opening test data."""
+    contracts: dict[str, dict[str, Any] | None] = {}
+    for source, path in paths.items():
+        cache = TranslationFeatureCache(features / source)
+        for row in read_manifest(path).accepted():
+            if row.split not in {"train", "dev"}:
+                continue
+            _, metadata = cache.load(row.clip_id)
+            current = metadata.get("preprocessing")
+            if current is not None and (not isinstance(current, dict) or not current):
+                raise ValueError("invalid preprocessing contract")
+            contracts[json.dumps(current, sort_keys=True, allow_nan=False)] = current
+    if len(contracts) != 1:
+        raise ValueError("train and dev features require one consistent preprocessing contract")
+    return next(iter(contracts.values()))
+
+
 def _dev(
     model: Any,
     tokenizer: Any,
@@ -114,6 +132,7 @@ def _dev(
     schema: str,
     identity: dict[str, Any],
     device: torch.device,
+    preprocessing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = read_manifest(manifest_path)
     rows = manifest.accepted("dev")
@@ -134,6 +153,7 @@ def _dev(
                     "caption": row.caption,
                     "feature_schema": schema,
                     "extractor": identity,
+                    "preprocessing": preprocessing,
                 },
             )
             if artifact is None:
@@ -199,6 +219,7 @@ def run_experiment(
     identity = loaded["how2sign"][2]
     if not identity or any(item[2] != identity for item in loaded.values()):
         raise ValueError("all experiment corpora require the same recorded extractor")
+    preprocessing = preprocessing_contract(paths, features)
     for manifest, _, _ in loaded.values():
         if manifest.accepted("unassigned"):
             raise ValueError("local experiments require assigned splits")
@@ -215,6 +236,9 @@ def run_experiment(
         "beam_width": 5,
         "decoder_tokens": 128,
         "loss_normalization": "valid-target-tokens-v1",
+        "preprocessing": preprocessing,
+        "preprocessing_status": "versioned" if preprocessing is not None else "legacy-unversioned",
+        "exposure_tracking": "per-source-clips-and-target-tokens-v1",
     }
     device = torch.device(device_name or ("cuda:0" if torch.cuda.is_available() else "cpu"))
     if device.type == "cpu" and config.precision != "fp32":
@@ -258,6 +282,7 @@ def run_experiment(
         "checkpoint_seconds_max": 0.0,
         "peak_vram_bytes": 0,
         "best_checkpoints": {},
+        "exposure": {},
     }
     latest = output / "latest.pt"
     if latest.exists():
@@ -301,6 +326,7 @@ def run_experiment(
             config.feature_schema,
             identity,
             device,
+            preprocessing=preprocessing,
         )
         elapsed = time.monotonic() - started
         state["validation_seconds"] = state.get("validation_seconds", 0.0) + elapsed
@@ -427,6 +453,15 @@ def run_experiment(
         timing["optimizer_seconds_max"] = max(timing.get("optimizer_seconds_max", 0.0), elapsed)
         state["global_step"] += 1
         state["phase_step"] += 1
+        exposure = state["exposure"].setdefault(source, {
+            "examples_seen": 0, "target_tokens": 0, "clip_counts": {}})
+        exposure["examples_seen"] += len(selected)
+        exposure["target_tokens"] += total_tokens
+        for clip_id, _caption in selected:
+            counts = exposure["clip_counts"]
+            counts[clip_id] = counts.get(clip_id, 0) + 1
+        exposure["unique_examples"] = len(exposure["clip_counts"])
+        exposure["effective_epochs"] = exposure["examples_seen"] / len(examples)
         state["train_loss"] = mean_loss
         completed += 1
         end_phase = state["phase_step"] >= maximum
