@@ -8,7 +8,7 @@
 - Train on filtered YouTube-ASL, fine-tune on How2Sign, and evaluate recorded-video translations.
 - Measure translation quality with BLEU and human meaning review, including questions, negation and failures.
 
-## Where we are — October 19, 2026
+## Where we are — October 21, 2026
 
 - [x] Implemented data import, frozen snapshots, source-overlap checks and verified recording staging.
 - [x] Implemented MMPose extraction, missing-point masks and identity-checked feature caches.
@@ -18,9 +18,25 @@
 - [x] Extracted pilot features for 54 train / 9 dev YouTube clips and 32 train / 8 dev How2Sign clips.
 - [x] Passed real ten-update versus 5+5 resumed training equivalence checks.
 - [x] Completed 32 YouTube updates followed by 16 How2Sign updates, checkpoints, dev controls and recorded inference.
+- [x] Fixed token-normalized gradient accumulation, recoverable checkpoint selection and caption-bounded frame sampling; added regression tests.
+- [x] Preserve raw pose coordinates, scores and timestamps with regional quality audits and versioned preprocessing identities.
+- [x] Stream extraction and overlays, reuse separate warm model workers, and bound verified feature caching to 64 MiB.
+- [x] Added source exposure accounting and dev-only conditioning, gradient and input-cost diagnostics.
+- [x] Compared the released Uni-Sign pose model with the pilot on eight dev clips: BLEU 6.90 versus 0.78; chrF 23.52 versus 6.79.
 - [x] Scored the pilot with BLEU and BLEURT; selected BLEURT fell below initial scores on both corpora, and YouTube shuffled inputs scored higher than real inputs.
 - [ ] Establish useful translation quality; the small engineering pilot does not demonstrate useful ASL translation.
-- [x] Restored Sol access and verified fresh-cookie acquisition: the three-worker check added 6 video/caption pairs, bringing saved coverage to 654 pairs.
+- [x] Earlier acquisition checkpoint: a three-worker check added 6 video/caption pairs, bringing saved coverage to 654 pairs at that checkpoint.
+- [x] Require fresh acquisition probes bound to the current cookie and official-source identities; cached pairs cannot prove authentication.
+
+The Uni-Sign comparison is an engineering check with unequal training exposure, not an architecture benchmark.
+Both models use the same dev references; no held-out test clips were scored. Human meaning review remains pending.
+The baseline checkpoint is at step 100. Its real, shuffled and static pose controls have almost identical dev
+likelihood, so temporal sensitivity needs investigation before scaling training.
+
+Measured baseline generation repeats were 246–248 ms with identical output after initialization.
+Native pose extraction took a median 6.98 seconds per clip (26.39 frames/second); this is separate from generation.
+Verified feature reads measured 2.26 ms from disk versus 0.14 ms warm; tokenization measured 0.10 ms,
+so an additional token cache is not justified by this sample.
 
 ## What we need to accomplish
 
@@ -28,6 +44,7 @@
 - [ ] Verify extraction completion, compatible caches and all requested example counts.
 - [ ] Diagnose learning on a small reviewed training set before increasing training scale.
 - [ ] Measure each download batch's newly acquired pairs, failure categories and useful pairs per hour before increasing concurrency.
+- [ ] Continue bounded unique-source acquisition; 5,000 complete pairs is the first training milestone, not a lifetime acquisition cap.
 - [ ] Review dev predictions, BLEU, meaning preservation, failures and shuffled-input controls.
 - [ ] Measure usable signing hours, source/signer diversity, training time, GPU memory and storage.
 - [ ] Expand data and training only after review and resource checks pass.
@@ -39,6 +56,7 @@
 - [x] Browser camera preview, silent clips up to 20 seconds, playback and English output.
 - [x] Actual 133-point MMPose landmarks synchronized with recorded playback after inference.
 - [x] Compact desktop/mobile layout, permission errors, single inference writer and temporary-file cleanup.
+- [x] Persistent extractor/translator workers with identity checks, failure recovery and total request timing.
 - [ ] Verify the browser-to-model workflow against a live Sol GPU allocation; model quality remains unverified.
 
 Start camera-only preview from the checkout with the project's Python environment:
@@ -74,3 +92,8 @@ processing at ten minutes. Session media and caches are removed after processing
 
 Run synthetic workspace checks with `python -m pytest tests/test_workspace.py -q`.
 The JavaScript contract check uses Node when available. These tests need no camera, dataset or weights.
+
+Inspect the bounded dev diagnostic and Uni-Sign comparison commands with
+`python -m asl_recognizer.translation.diagnostics --help` and
+`python -m asl_recognizer.translation.comparison --help`.
+Run real diagnostics and comparisons only inside a Sol GPU allocation; keep media, model assets and outputs on Sol.
