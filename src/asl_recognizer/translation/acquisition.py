@@ -362,7 +362,7 @@ def acquire_youtube(
             if (
                 previous
                 and previous["availability"] == "available"
-                and all(verify_seal(s) for s in previous["files"])
+                and all(verify_seal(s, cached=True) for s in previous["files"])
             ):
                 continue
             if previous and previous["availability"] == "available":
