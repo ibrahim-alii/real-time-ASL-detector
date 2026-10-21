@@ -13,14 +13,12 @@ from typing import Any
 
 import torch
 
-from ..features.mmpose_backend import MMPoseWholeBodyBackend
-from ..features.video import every_other_video_frame
 from .cache import TranslationFeatureCache
 from .experiment import checkpoint_model_config
-from .features import mmpose_translation_request
-from .local_runtime import extractor_identity, write_overlay
 from .model import LandmarkT5
+from .runtime import ExtractionEngine
 from .schema import MMPOSE_SCHEMA
+from .sol_common import write_json
 from .youtube import file_hash
 
 
@@ -29,49 +27,18 @@ def extract_video(
     threshold: float = 0.5, start_ms: int = 0, end_ms: int | None = None,
     overlay: Path | None = None,
 ) -> dict[str, Any]:
-    import cv2
-
     if output.exists():
         raise FileExistsError(output)
-    started = time.perf_counter()
-    capture = cv2.VideoCapture(str(video))
+    engine = ExtractionEngine(assets, device=device, threshold=threshold)
     try:
-        fps = float(capture.get(cv2.CAP_PROP_FPS))
-        count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        if not capture.isOpened() or fps <= 0 or count <= 0:
-            raise ValueError("unreadable recorded video")
-        duration = round(count * 1000 / fps)
+        report = engine.extract(video=video, output=output, start_ms=start_ms,
+                                end_ms=end_ms, overlay=overlay)
+        report["peak_vram_bytes"] = (torch.cuda.max_memory_allocated(device)
+                                     if device.startswith("cuda") else 0)
+        write_json(output / "extraction.json", report)
+        return report
     finally:
-        capture.release()
-    end_ms = duration if end_ms is None else end_ms
-    if end_ms > duration:
-        raise ValueError("sentence interval exceeds recording duration")
-    sampled = every_other_video_frame(video, start_ms=start_ms, end_ms=end_ms)
-    if not sampled.frames or len(sampled.frames) != sampled.requested_frames:
-        raise ValueError("recording could not decode every requested frame")
-    identity = extractor_identity(assets, threshold)
-    if device.startswith("cuda"):
-        torch.empty(1, device=device)
-        torch.cuda.reset_peak_memory_stats(device)
-    with MMPoseWholeBodyBackend(
-        **assets, device=device, confidence_threshold=threshold
-    ) as detector:
-        frames = [detector.detect_translation(image, timestamp)
-                  for image, timestamp in sampled.frames]
-    request = mmpose_translation_request(frames)
-    if overlay is not None:
-        write_overlay(video, list(zip((image for image, _ in sampled.frames), frames, strict=True)),
-                      overlay)
-    elapsed = time.perf_counter() - started
-    metadata = {"feature_schema": MMPOSE_SCHEMA, "extractor": identity,
-                "source_video_hash": file_hash(video), "start_ms": start_ms, "end_ms": end_ms}
-    TranslationFeatureCache(output).store("recorded", request, metadata=metadata)
-    report = {**metadata, "sampled_frames": len(frames), "encoder_frames": len(request.values),
-              "extraction_seconds": elapsed, "processing_fps": len(frames) / elapsed,
-              "peak_vram_bytes": torch.cuda.max_memory_allocated(device)
-              if device.startswith("cuda") else 0}
-    (output / "extraction.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    return report
+        engine.close()
 
 
 def infer_video(
@@ -110,6 +77,9 @@ def infer_video(
     request, metadata = TranslationFeatureCache(feature_root).load("recorded")
     if metadata["extractor"] != expected:
         raise ValueError("recorded extractor differs from checkpoint; translation refused")
+    preprocessing = saved["config"].get("preprocessing")
+    if preprocessing is not None and metadata.get("preprocessing") != preprocessing:
+        raise ValueError("recorded preprocessing differs from checkpoint; translation refused")
     if device.startswith("cuda"):
         torch.empty(1, device=device)
         torch.cuda.reset_peak_memory_stats(device)
