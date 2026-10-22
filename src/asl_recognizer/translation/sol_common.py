@@ -73,12 +73,15 @@ def scan_tree_bytes(root: Path) -> int:
                     try:
                         total += entry.stat().st_size
                     except FileNotFoundError:
-                        if not entry.name.endswith(".video-only.mp4"):
+                        if entry.name.endswith(".video-only.mp4"):
+                            published = Path(entry.path).with_name(
+                                entry.name.removesuffix(".video-only.mp4") + ".mp4"
+                            )
+                        elif entry.name.endswith((".part", ".ytdl", ".tmp")):
+                            published = Path(entry.path).with_suffix("")
+                        else:
                             raise
-                        # Remux publication renames this file over the MP4; double counting is safe.
-                        published = Path(entry.path).with_name(
-                            entry.name.removesuffix(".video-only.mp4") + ".mp4"
-                        )
+                        # Count the published destination conservatively after a staging rename.
                         total += published.stat().st_size
         return total
 
