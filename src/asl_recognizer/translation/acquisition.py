@@ -355,7 +355,7 @@ def acquire_youtube(
     )
     if ledger["identity"] != identity:
         raise ValueError("acquisition identity changed; use a new run")
-    ids = ids_path.read_text(encoding="utf-8").splitlines()
+    ids = list(dict.fromkeys(ids_path.read_text(encoding="utf-8").splitlines()))
     if attempts < 1 or byte_limit < 1 or any(not VIDEO_ID.fullmatch(i) for i in ids):
         raise ValueError("invalid acquisition limits or IDs")
     ids.sort(key=lambda i: hashlib.sha256(f"{seed}:{i}".encode()).hexdigest())
