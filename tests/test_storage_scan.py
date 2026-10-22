@@ -49,12 +49,15 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path):
     assert s.scan_tree_bytes(root) == s.tree_bytes(root) == 3
 
 
-def test_remux_rename_counts_published_file_conservatively(tmp_path, monkeypatch):
+@pytest.mark.parametrize("staging_name", [
+    "clip.video-only.mp4", "clip.mp4.part", "clip.mp4.ytdl", "clip.mp4.tmp",
+])
+def test_publication_rename_counts_destination_conservatively(tmp_path, monkeypatch, staging_name):
     from contextlib import nullcontext
 
     published = tmp_path / "clip.mp4"
     published.write_bytes(b"old!")
-    temporary = tmp_path / "clip.video-only.mp4"
+    temporary = tmp_path / staging_name
     temporary.write_bytes(b"new!!!")
     old = Mock(name="published")
     old.name, old.path = published.name, str(published)
@@ -75,11 +78,14 @@ def test_remux_rename_counts_published_file_conservatively(tmp_path, monkeypatch
     assert s.scan_tree_bytes(tmp_path) == 10 >= published.stat().st_size
 
 
-def test_missing_remux_and_published_file_still_fails_closed(tmp_path, monkeypatch):
+@pytest.mark.parametrize("staging_name", [
+    "clip.video-only.mp4", "clip.mp4.part", "clip.mp4.ytdl", "clip.mp4.tmp",
+])
+def test_missing_staging_and_destination_fails_closed(tmp_path, monkeypatch, staging_name):
     from contextlib import nullcontext
 
     entry = Mock()
-    entry.name, entry.path = "clip.video-only.mp4", str(tmp_path / "clip.video-only.mp4")
+    entry.name, entry.path = staging_name, str(tmp_path / staging_name)
     entry.is_dir.return_value = False
     entry.is_file.return_value = True
     entry.stat.side_effect = FileNotFoundError("removed")
