@@ -141,7 +141,7 @@ def translate_clip(data: bytes, config: dict[str, Any],
         source.write_bytes(data)
         subprocess.run(
             ["ffmpeg", "-v", "error", "-nostdin", "-i", str(source), "-an", "-t", "21",
-             "-vf", "scale=640:480:force_original_aspect_ratio=decrease",
+             "-vf", "scale=640:480:force_original_aspect_ratio=decrease:force_divisible_by=2",
              "-r", "30", "-c:v", "libx264", "-preset", "fast",
              "-pix_fmt", "yuv420p", str(video)],
             check=True, capture_output=True, timeout=45,
