@@ -3,61 +3,144 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f5f5ef">
+<meta name="theme-color" content="#fafbf9">
 <link rel="icon" href="data:,">
 <title>ASL — Signing workspace</title>
 <style>
-:root{color-scheme:light;--paper:#f5f5ef;--ink:#202e28;--muted:#58665d;--line:#d6ddd4;--green:#265b40;--tint:#e5ece2;--stage:#18241f;--error:#9a302a;font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink)}button,input{font:inherit}button{cursor:pointer;min-height:44px;border:1px solid var(--line);border-radius:7px;padding:10px 17px;background:transparent;color:var(--ink);font-weight:600;transition:background .16s ease-out}button:hover:not(:disabled){background:var(--tint)}button:disabled{cursor:not-allowed;color:#6b756d;background:#ebeee7}button.primary{background:var(--green);border-color:var(--green);color:white}button.primary:hover:not(:disabled){background:#19472f}button.primary:disabled{background:#dce3d8;border-color:#dce3d8;color:#5e6d61}button.danger{background:#963b33;border-color:#963b33;color:white}button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #b86a28;outline-offset:4px}::selection{background:#c7dec3;color:#172e20}input{accent-color:var(--green);caret-color:var(--green)}a{color:var(--green);text-underline-offset:4px}svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}button svg{width:18px;height:18px;vertical-align:-3px;margin-right:7px}header{max-width:1440px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:25px 48px;border-bottom:1px solid var(--line);gap:20px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-size:21px;font-weight:750;letter-spacing:-.03em}.brand svg{width:30px;height:30px}.brand span{border-left:1px solid var(--line);padding-left:16px;margin-left:4px;color:var(--muted);font-weight:400;font-size:14px;letter-spacing:0}.connection{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}.dot{height:7px;width:7px;border-radius:50%;background:#7b826e;flex-shrink:0}.dot.online{background:var(--green)}.link-button{border:0;padding:5px 9px;font-size:13px;min-height:36px;text-decoration:underline;text-underline-offset:3px}main{max-width:1440px;margin:auto;padding:42px 48px 28px}h1{font-size:clamp(27px,3vw,38px);font-weight:600;letter-spacing:-.035em;line-height:1.2;margin:0 0 10px;text-wrap:balance}.intro{color:var(--muted);margin:0 0 34px;max-width:70ch}.workspace{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fcfcf8;box-shadow:0 12px 36px -24px #20352b55}.capture{min-width:0;border-right:1px solid var(--line)}.panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;gap:12px;min-height:68px}h2{font-size:15px;font-weight:650;margin:0}.small{font-size:12px;color:var(--muted)}.timer{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}.stage{position:relative;background:var(--stage);aspect-ratio:4/3;overflow:hidden;color:#d2dfd5}.stage video{width:100%;height:100%;object-fit:contain;display:block}.stage canvas{position:absolute;pointer-events:none;inset:0;width:100%;height:100%;object-fit:contain}.stage.preview.mirror video{transform:scaleX(-1)}.stage .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:26px;text-align:center}.camera-icon{width:56px;height:56px;margin-bottom:18px;color:#abc0af}.empty strong{font-size:20px;font-weight:500}.empty p{font-size:14px;max-width:31ch;color:#b0c1b5;margin:8px 0 22px}.empty button{color:#e3ece5;border-color:#647b6b}.empty button:hover:not(:disabled){background:#304a39}.stage-label{position:absolute;left:18px;top:16px;background:#15231ee6;border:1px solid #5a6c60;padding:4px 10px;border-radius:4px;font-size:12px;pointer-events:none}.stage-label.recording{background:#752c27;color:white;border-color:#ad5b54}.options{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line);font-size:13px}.options label{display:flex;gap:7px;align-items:center;min-height:24px}.options input{width:16px;height:16px;margin:0}.actions{padding:18px 22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.actions .small{margin-left:auto}.translation{display:flex;flex-direction:column;min-width:0}.translation .panel-head{border-bottom:1px solid var(--line)}.language{font-size:12px;color:var(--muted)}.output{padding:30px 28px;flex:1;min-height:230px}.output-empty{padding-top:46px}.output-icon{width:34px;height:34px;color:#7d927f;margin-bottom:18px}.output h3{margin:0 0 8px;font-size:20px;font-weight:500;letter-spacing:-.02em}.output p{font-size:14px;color:var(--muted);max-width:33ch;margin:0}.english{font-size:clamp(23px,2.3vw,31px);line-height:1.45;letter-spacing:-.025em;overflow-wrap:anywhere;white-space:pre-wrap}.result-meta{margin-top:22px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}.translate-actions{padding:0 28px 24px;display:flex;gap:8px;flex-wrap:wrap}.translate-actions .primary{flex:1}.notice{padding:17px 28px;border-top:1px solid var(--line);background:#f0f3eb;font-size:12px;color:#52604e;margin:0}.status-row{display:flex;align-items:flex-start;gap:12px;margin:18px 0 0;min-height:24px;color:var(--muted);font-size:13px}.status-row .dot{margin-top:7px}.status-row.error{color:var(--error)}.status-row.error .dot{background:var(--error)}.guidance{display:flex;justify-content:space-between;gap:25px;margin-top:26px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}.guidance p{margin:0;max-width:60ch}.guidance strong{color:var(--ink);font-weight:600}.working{animation:working 1.4s ease-out infinite}@keyframes working{50%{opacity:.45}}[hidden]{display:none!important}footer{max-width:1440px;margin:auto;padding:0 48px 26px;color:var(--muted);font-size:11px}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media(min-width:1500px){main{padding-top:58px}}@media(max-width:850px){header{padding:20px 24px}.brand span{display:none}main{padding:30px 24px}.workspace{grid-template-columns:1fr}.capture{border-right:0;border-bottom:1px solid var(--line)}.output{min-height:220px}.output-empty{padding-top:10px}.guidance{flex-direction:column;gap:12px}footer{padding:0 24px 24px}}@media(max-width:430px){header{padding:16px}.connection{gap:6px;font-size:11px}.link-button{font-size:11px;padding:3px}main{padding:25px 16px}.intro{font-size:14px;margin-bottom:24px}.panel-head,.options,.actions{padding-left:16px;padding-right:16px}.actions .small{width:100%;margin:0}.output,.translate-actions,.notice{padding-left:20px;padding-right:20px}.stage .empty{padding:16px}.empty p{margin-bottom:12px}.camera-icon{width:40px;height:40px;margin-bottom:10px}}
-/* Keep the working surface inside the viewport; long results scroll within their panel. */
-body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-header{width:100%;padding:14px 36px;flex-shrink:0}
-main{width:100%;flex:1;min-height:0;padding:18px 36px 20px;display:flex;flex-direction:column}
-h1{font-size:clamp(26px,2.5vw,34px);margin-bottom:6px}
-.intro{font-size:14px;margin-bottom:20px}
-.workspace{flex:1;min-height:0;box-shadow:none}
-.capture{display:flex;flex-direction:column}
-.panel-head{padding:12px 20px;min-height:50px;flex-shrink:0;border-bottom:1px solid var(--line)}
-.stage{flex:1;min-height:120px;aspect-ratio:auto}
-.options{height:52px;min-height:52px;padding:10px 20px;gap:16px;flex-shrink:0}
-.actions{height:68px;min-height:68px;padding:12px 20px;flex-shrink:0}
-.output{min-height:0;overflow:auto;scrollbar-color:#92a38e #f0f3eb;scrollbar-width:thin;padding:26px}
-.output-empty{padding-top:24px}
-.translation{min-height:0}
-.notice{height:52px;min-height:52px;display:flex;align-items:center;padding:8px 20px;font-size:11px;flex-shrink:0}
-.translate-actions{height:68px;min-height:68px;padding:12px 20px;margin:0;border-top:1px solid var(--line);flex-shrink:0}
-.status-row{margin-top:10px;min-height:0;flex-shrink:0}
-@media(max-width:1100px) and (min-width:851px){.workspace{grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr)}.options{gap:12px}.options .small,.actions .small{display:none}}
-@media(max-width:850px){
- header{padding:10px 16px}main{padding:12px 16px 14px}
- h1{font-size:26px}.intro{font-size:13px;margin-bottom:12px}
- .workspace{display:flex;flex-direction:column;overflow:auto;scrollbar-width:thin}
- .capture{flex-shrink:0;border-bottom:1px solid var(--line)}
- .panel-head{min-height:42px;height:42px;padding:9px 16px}
- .stage{height:clamp(160px,25dvh,250px);min-height:160px;flex:none}
- .camera-icon{width:32px;height:32px;margin-bottom:8px}.empty strong{font-size:17px}
- .empty p{display:none}.empty button{margin-top:14px;min-height:40px;padding:7px 14px}
- .options{height:40px;min-height:40px;padding:7px 16px;gap:16px;font-size:12px}
- .options .small,.actions .small{display:none}
- .actions,.translate-actions{height:58px;min-height:58px;padding:7px 16px}
- .translation{flex:1;min-height:220px;overflow:visible}
- .output{padding:16px 20px;min-height:90px}.output-empty{padding-top:0}
- .output-icon{display:none}.output h3{font-size:18px}.output p{font-size:12px;max-width:45ch}
- .notice{height:auto;min-height:40px;padding:6px 16px;font-size:10px}
- .english{font-size:21px}.result-meta{margin-top:10px;font-size:10px}
- .status-row{font-size:12px;margin-top:8px}
+:root {
+  color-scheme:light;
+  --paper:#fafbf9; --surface:#ffffff; --ink:#293229; --muted:#626c61;
+  --line:#d6dbd2; --accent:#ffbb72; --tint:#ffe9d0; --stage:#e9ede5; --error:#9a302a;
+  font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
-@media(max-height:650px) and (min-width:851px){header{padding-top:8px;padding-bottom:8px}main{padding-top:10px;padding-bottom:12px}.intro{margin-bottom:12px}.output-empty{padding-top:0}.camera-icon{height:36px;margin-bottom:8px}.empty p{margin-bottom:12px}}
+*{box-sizing:border-box}
+/* Keep the working surface inside the viewport; long results scroll within their panel. */
+body{margin:0;height:100dvh;min-height:680px;display:flex;flex-direction:column;background:var(--paper);color:var(--ink)}
+button,input{font:inherit}
+button{cursor:pointer;min-height:44px;border:1px solid var(--line);border-radius:24px;padding:10px 20px;background:transparent;color:var(--ink);font-weight:600;transition:background .16s ease-out}
+button:hover:not(:disabled){background:var(--tint)}
+button:disabled{cursor:not-allowed;color:#8b9288;border-color:#dde1da;background:transparent}
+button.primary{background:var(--accent);border-color:#9c672c;color:#332b20}
+button.primary:hover:not(:disabled){background:#ffad53}
+button.primary:disabled{background:#edf0e9;border-color:#dde1da;color:#8b9288}
+button.danger{background:#963b33;border-color:#963b33;color:white}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #965818;outline-offset:4px}
+::selection{background:var(--accent);color:var(--ink)}
+input{accent-color:#925319;caret-color:#925319}
+a{color:#925319;text-underline-offset:4px}
+svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+button svg{width:18px;height:18px;vertical-align:-3px;margin-right:7px}
+header{width:100%;max-width:1440px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-size:23px;font-weight:750;letter-spacing:-.03em}
+.brand svg{width:34px;height:34px;color:#9b5a20}
+.brand span{padding-left:16px;margin-left:4px;border-left:1px solid var(--line);color:var(--muted);font-weight:400;font-size:13px;letter-spacing:0}
+.connection{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--line)}
+.connection #connection{flex:1;min-width:130px}
+.dot{height:7px;width:7px;border-radius:50%;background:#8b7b68;flex-shrink:0}
+.dot.online{background:#39724d}
+.link-button{border:0;background:transparent;padding:5px 8px;font-size:12px;min-height:44px;text-decoration:underline;text-underline-offset:3px}
+main{max-width:1440px;margin:0 auto;width:100%;flex:1;min-height:0;padding:18px 40px 24px;display:flex;flex-direction:column}
+.title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;margin-bottom:32px}
+h1{font:400 64px/1.04 Georgia,"Times New Roman",serif;letter-spacing:-.04em;margin:0;text-wrap:balance}
+h1 .headline-target{color:#975b23}
+.intro{color:var(--muted);font-size:14px;margin:0 0 4px;max-width:30ch;flex-shrink:0}
+.workspace{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:48px;flex:1;min-height:0}
+.capture{display:flex;flex-direction:column;min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;gap:12px;min-height:42px;flex-shrink:0}
+h2{font-size:14px;font-weight:650;margin:0}
+.small{font-size:12px;color:var(--muted)}
+.timer{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+.stage{position:relative;background:var(--stage);flex:1;min-height:220px;overflow:hidden;color:var(--ink);border-radius:22px}
+.stage::before,.stage::after{content:"";position:absolute;width:38px;height:38px;border-color:#9aa692;border-style:solid;z-index:1;pointer-events:none}
+.stage::before{left:22px;top:22px;border-width:1px 0 0 1px;border-radius:4px 0 0}
+.stage::after{right:22px;bottom:22px;border-width:0 1px 1px 0;border-radius:0 0 4px}
+.stage video{width:100%;height:100%;position:absolute;object-fit:contain;display:block}
+.stage canvas{position:absolute;pointer-events:none;inset:0;width:100%;height:100%;object-fit:contain}
+.stage.preview.mirror video{transform:scaleX(-1)}
+.stage .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:32px;text-align:center}
+.camera-icon{width:44px;height:44px;margin-bottom:22px;color:#76816d}
+.empty strong{font:400 32px/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.025em}
+.empty p{font-size:14px;max-width:32ch;color:#5c6856;margin:14px 0 24px}
+.empty button{background:var(--accent);color:#332b20;border-color:#9c672c;padding:12px 26px}
+.empty button:hover:not(:disabled){background:#ffad53}
+.stage-label{position:absolute;left:22px;top:22px;background:var(--surface);border:1px solid var(--line);padding:5px 12px;border-radius:18px;font-size:12px;pointer-events:none;z-index:2}
+.stage-label.recording{background:#963b33;color:white;border-color:#963b33}
+.options{display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:12px;flex-shrink:0}
+.options label{display:flex;gap:7px;align-items:center;min-height:44px}
+.options input{width:16px;height:16px;margin:0}
+.landmark-option{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.landmark-option .small{font-size:12px}
+.actions{padding:16px 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+.actions .small{margin-left:auto}
+.translation{display:flex;flex-direction:column;min-width:0;min-height:0}
+.translation .panel-head{border-bottom:2px solid var(--ink);padding-bottom:14px}
+.translation h2{font:400 25px/1 Georgia,"Times New Roman",serif}
+.language{font-size:12px;color:var(--muted)}
+.output{padding:28px 0;flex:1;min-height:0;overflow:auto;scrollbar-color:#9aa692 #edf0e9;scrollbar-width:thin}
+.output-empty{padding-top:16px}
+.output-icon{display:none}
+.output h3{margin:0 0 18px;max-width:12ch;font:400 38px/1.1 Georgia,"Times New Roman",serif;letter-spacing:-.03em}
+.output p{font-size:14px;color:var(--muted);max-width:30ch;margin:0}
+.english{font:400 30px/1.4 Georgia,"Times New Roman",serif;letter-spacing:-.02em;overflow-wrap:anywhere;white-space:pre-wrap}
+.result-meta{margin-top:22px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.translate-actions{padding:16px 0 4px;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.translate-actions .primary{flex:1}
+.notice{padding:16px 0;border-top:1px solid var(--line);font-size:12px;color:var(--muted);margin:0;flex-shrink:0}
+.status-row{display:flex;align-items:flex-start;gap:12px;margin:12px 0 0;flex-shrink:0;color:var(--muted);font-size:13px}
+.status-row .dot{margin-top:7px}
+.status-row.error{color:var(--error)}
+.status-row.error .dot{background:var(--error)}
+.working{animation:working 1.4s ease-out infinite}
+@keyframes working{50%{opacity:.6}}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:1100px) and (min-width:851px){
+  header{padding-left:28px;padding-right:28px}main{padding-left:28px;padding-right:28px}
+  h1{font-size:50px}.title-row{gap:24px}.intro{max-width:25ch}
+  .workspace{gap:32px;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr)}
+  .actions .small{width:100%;margin:0}.landmark-option{gap:0;flex-direction:column;align-items:flex-start}
+}
+@media(max-width:850px){
+  body{height:auto;min-height:100dvh}
+  header{padding:18px 24px}.brand span{font-size:12px}
+  main{padding:18px 24px 28px;flex:none}
+  .title-row{display:block;margin-bottom:28px}
+  h1{font-size:52px;max-width:12ch}.intro{font-size:14px;margin:18px 0 0;max-width:36ch}
+  .workspace{display:flex;flex-direction:column;flex:none;gap:36px}
+  .panel-head{min-height:40px}
+  .stage{height:clamp(290px,42dvh,420px);min-height:290px;flex:none}
+  .empty strong{font-size:30px}.empty p{font-size:13px}
+  .options{gap:14px}.landmark-option{gap:0;flex-direction:column;align-items:flex-start}
+  .landmark-option .small{margin-left:23px;margin-top:-4px}
+  .actions{padding-top:16px}.actions .small{width:100%;margin:0}
+  .translation{min-height:360px;flex:none}
+  .output{padding:28px 0;min-height:190px;overflow:visible;flex:none}
+  .output-empty{padding-top:0}.output h3{font-size:34px;max-width:none}
+  .output p{max-width:40ch}.english{font-size:28px}
+  .connection{padding:8px 0}.notice{padding:16px 0}
+}
+@media(max-width:430px){
+  header{padding:16px 20px}.brand{gap:8px;font-size:21px}.brand svg{width:30px;height:30px}
+  .brand span{padding-left:12px;margin-left:2px}
+  main{padding:14px 20px 24px}h1{font-size:46px}
+  .stage .empty{padding:26px}.camera-icon{width:36px;height:36px;margin-bottom:18px}
+  .empty strong{font-size:27px}.actions{gap:8px}.options{align-items:flex-start}
+}
+@media(max-height:750px) and (min-width:851px){
+  body{min-height:650px}header{padding-top:10px;padding-bottom:10px}
+  main{padding-top:12px;padding-bottom:18px}.title-row{margin-bottom:24px}h1{font-size:50px}
+  .stage{min-height:200px}.camera-icon{display:none}.empty p{margin:12px 0 18px}
+  .empty strong{font-size:28px}.output h3{font-size:32px}.output-empty{padding-top:0}
+}
 </style>
 </head>
 <body>
 <header>
   <a class="brand" href="/" aria-label="ASL workspace home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 20V13a2 2 0 0 1 4 0v4-10a2 2 0 0 1 4 0v9-11a2 2 0 0 1 4 0v11-8a2 2 0 0 1 4 0v11l3-3a2 2 0 0 1 3 3l-6 8a7 7 0 0 1-6 3h-2a8 8 0 0 1-8-8Z"/></svg>ASL<span>Signing workspace</span></a>
-  <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection">Checking Sol…</span><button class="link-button" id="reconnect">Check connection</button></div>
 </header>
 <main>
-  <h1>From signing to English.</h1>
-  <p class="intro">Record one sentence. Review the landmarks and translation, side by side.</p>
+  <div class="title-row"><h1>From signing <br><span class="headline-target">to English.</span></h1>
+  <p class="intro">Record one sentence. Review the landmarks and translation, side by side.</p></div>
   <div class="workspace">
     <section class="capture" aria-labelledby="camera-title">
       <div class="panel-head"><h2 id="camera-title">Camera &amp; landmarks</h2><span class="timer" id="timer">00:00 / 00:20</span></div>
@@ -72,16 +155,17 @@ h1{font-size:clamp(26px,2.5vw,34px);margin-bottom:6px}
         </div>
         <span class="stage-label" id="stage-label" hidden>Camera preview</span>
       </div>
-      <div class="options"><label><input type="checkbox" id="landmarks" disabled checked>Show landmarks</label><label><input type="checkbox" id="mirror" checked>Mirror preview</label><span class="small" id="landmark-note">Available after translation</span></div>
       <div class="actions">
         <button class="primary" id="record" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg><span>Record clip</span></button>
         <button id="reset" disabled>New clip</button>
         <button class="link-button" id="release" hidden>Turn camera off</button>
         <span class="small">20 seconds max · no audio</span>
       </div>
+      <div class="options"><div class="landmark-option"><label><input type="checkbox" id="landmarks" aria-describedby="landmark-note" disabled checked>Show landmarks</label><span class="small" id="landmark-note">Available after translation</span></div><label><input type="checkbox" id="mirror" checked>Mirror preview</label></div>
     </section>
     <section class="translation" aria-labelledby="translation-title">
       <div class="panel-head"><h2 id="translation-title">Translation</h2><span class="language">ASL to English</span></div>
+  <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection">Checking Sol…</span><button class="link-button" id="reconnect">Check connection</button></div>
       <div class="output" aria-live="polite" aria-busy="false" id="output">
         <div class="output-empty" id="output-empty"><svg class="output-icon" viewBox="0 0 36 36" aria-hidden="true"><path d="M7 8h22v16H17l-7 6v-6H7ZM13 14h10M13 19h6"/></svg><h3>Ready when you are.</h3><p>Your English translation will appear here after you record and submit a clip.</p></div>
         <div class="english" id="english" hidden></div>
@@ -200,7 +284,7 @@ async function checkConnection() {
     const response=await fetch("/api/status",{signal:AbortSignal.timeout(5000)});
     if (!response.ok) throw new Error("Unavailable");
     const data=await response.json(); state.ready=data.ready===true;
-    $("connection").textContent=state.ready ? "Sol connected" : "Local preview";
+    $("connection").textContent=state.ready ? "Sol connected" : "Preview only · connect Sol to translate";
     if (!state.ready && state.clip) message("Clip ready for review. Open a configured Sol workspace to translate.");
   } catch { state.ready=false; $("connection").textContent="Server unavailable"; message("Workspace server is unavailable. Restart it, then check the connection.",true); }
   finally { $("connection-dot").classList.toggle("online",state.ready); $("reconnect").disabled=false; controls(); }
