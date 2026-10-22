@@ -151,7 +151,10 @@ def test_translation_returns_display_data_and_cleans_session(
     capture.get.return_value = 30
     monkeypatch.setattr("cv2.VideoCapture", lambda *_: capture)
     monkeypatch.setattr(workspace.shutil, "disk_usage", lambda _: MagicMock(free=3 * 1024**3))
-    monkeypatch.setattr(workspace.subprocess, "run", lambda *_, **__: None)
+    transcodes: list[list[str]] = []
+    monkeypatch.setattr(
+        workspace.subprocess, "run", lambda command, **_: transcodes.append(command)
+    )
     commands: list[list[str]] = []
 
     def start(command: list[str], **_: object) -> MagicMock:
@@ -178,6 +181,9 @@ def test_translation_returns_display_data_and_cleans_session(
         assert not list(Path(temporary).iterdir())
         assert "--extraction-python" in commands[0]
         assert commands[0][-1] == "synthetic-path"
+        filters = transcodes[0][transcodes[0].index("-vf") + 1]
+        assert filters == "scale=640:480:force_original_aspect_ratio=decrease:force_divisible_by=2"
+        assert transcodes[0][transcodes[0].index("-pix_fmt") + 1] == "yuv420p"
 
 
 def test_frontend_result_validation_and_syntax() -> None:
