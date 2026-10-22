@@ -47,3 +47,42 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path):
     except OSError:
         pytest.skip("directory symlink privileges unavailable")
     assert s.scan_tree_bytes(root) == s.tree_bytes(root) == 3
+
+
+def test_remux_rename_counts_published_file_conservatively(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+
+    published = tmp_path / "clip.mp4"
+    published.write_bytes(b"old!")
+    temporary = tmp_path / "clip.video-only.mp4"
+    temporary.write_bytes(b"new!!!")
+    old = Mock(name="published")
+    old.name, old.path = published.name, str(published)
+    old.is_dir.return_value = False
+    old.is_file.return_value = True
+    old.stat.side_effect = published.stat
+    pending = Mock(name="temporary")
+    pending.name, pending.path = temporary.name, str(temporary)
+    pending.is_dir.return_value = False
+    pending.is_file.return_value = True
+
+    def rename_then_stat():
+        temporary.replace(published)
+        raise FileNotFoundError(str(temporary))
+
+    pending.stat.side_effect = rename_then_stat
+    monkeypatch.setattr(s.os, "scandir", lambda _: nullcontext([old, pending]))
+    assert s.scan_tree_bytes(tmp_path) == 10 >= published.stat().st_size
+
+
+def test_missing_remux_and_published_file_still_fails_closed(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+
+    entry = Mock()
+    entry.name, entry.path = "clip.video-only.mp4", str(tmp_path / "clip.video-only.mp4")
+    entry.is_dir.return_value = False
+    entry.is_file.return_value = True
+    entry.stat.side_effect = FileNotFoundError("removed")
+    monkeypatch.setattr(s.os, "scandir", lambda _: nullcontext([entry]))
+    with pytest.raises(FileNotFoundError):
+        s.scan_tree_bytes(tmp_path)
