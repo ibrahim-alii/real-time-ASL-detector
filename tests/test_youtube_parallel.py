@@ -59,6 +59,24 @@ def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no
                       scratch_remaining=lambda: 100000, workers=2), runner
 
 
+@pytest.mark.parametrize('workers', [1, 2, 10])
+def test_duplicate_ids_schedule_one_attempt_per_source(tmp_path, monkeypatch, workers):  # type: ignore[no-untyped-def]
+    _root, kwargs, _runner = fixture(tmp_path, monkeypatch)
+    kwargs['ids_path'].write_text('abcdefghijk\nabcdefghijk\nlmnopqrstuv\n')
+    kwargs['workers'] = workers
+    seen: list[str] = []
+
+    def acquire(row, **_kwargs):  # type: ignore[no-untyped-def]
+        seen.append(row['video_id'])
+        row.update(reason='synthetic retryable failure', failure_kind='retryable')
+        return row, None, False
+
+    monkeypatch.setattr(acquisition, '_acquire_youtube_source', acquire)
+    result = acquisition.acquire_youtube(**kwargs)
+    assert sorted(seen) == ['abcdefghijk', 'lmnopqrstuv']
+    assert all(row['attempts'] == 1 for row in result['videos'].values())
+
+
 def test_two_sources_overlap_and_only_coordinator_writes_ledger(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
     root, kwargs, original = fixture(tmp_path, monkeypatch)
     barrier = threading.Barrier(2)
