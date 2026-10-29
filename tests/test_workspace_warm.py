@@ -38,7 +38,7 @@ def test_warm_runtime_reuses_isolated_workers_and_closes(tmp_path, monkeypatch):
 
         def request(self, item):
             self.calls.append(item)
-            if "video" in item:
+            if self is workers[0]:
                 return {"extraction_seconds": 0.1}
             return {
                 "english": "fixture",
@@ -52,7 +52,7 @@ def test_warm_runtime_reuses_isolated_workers_and_closes(tmp_path, monkeypatch):
     config = dict.fromkeys(
         ("python", "extraction_python", "checkpoint", *module.ASSET_NAMES), "fixture"
     )
-    config["work_root"] = str(tmp_path)
+    config.update(work_root=str(tmp_path), model="shubert", shubert_model_root="fixture")
     runtime = module.WarmRuntime(config)
     for index in range(2):
         root = tmp_path / str(index)
@@ -76,7 +76,7 @@ def test_failed_worker_start_cleans_session(tmp_path, monkeypatch):
     config = dict.fromkeys(
         ("python", "extraction_python", "checkpoint", *module.ASSET_NAMES), "fixture"
     )
-    config["work_root"] = str(tmp_path)
+    config.update(work_root=str(tmp_path), model="shubert", shubert_model_root="fixture")
     with pytest.raises(RuntimeError):
         module.WarmRuntime(config)
     assert not list(tmp_path.iterdir())
