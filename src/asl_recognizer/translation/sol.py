@@ -33,6 +33,8 @@ STAGES = (
     "ablation-finalize",
     "recorded-inference",
 )
+RETIRED_STAGES = {"smoke", "benchmark", "train", "finalize", "diagnostic",
+                  "ablation", "ablation-finalize", "recorded-inference"}
 CPU_STAGES = {"bootstrap", "annotations", "how2sign", "youtube-download", "manifests"}
 ACTIVE = {"PENDING", "RUNNING", "CONFIGURING", "COMPLETING", "SUSPENDED", "REQUEUED"}
 
@@ -286,6 +288,10 @@ def advance(config_path: Path, action: str) -> dict[str, Any]:
             write_json(state_path, state)
             return state
         stage = STAGES[state["stage_index"]]
+        if stage in RETIRED_STAGES:
+            state.update(stage=stage, status="retired", auto_continue=False)
+            write_json(state_path, state)
+            return state
         sequence = int(state.get("sequence", 0)) + 1
         token = hashlib.sha256(
             f"{deployment['bundle_sha256']}:{config_path}:{stage}:{sequence}".encode()
