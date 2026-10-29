@@ -76,10 +76,12 @@ class WarmRuntime:
             else:
                 command = [config["python"], *common, "--role", "translate",
                            "--checkpoint", config["checkpoint"]]
+            pythonpath = os.pathsep.join([src, *config.get("unisign_pythonpath", [])]) \
+                if self.model == "unisign" else src
             self.translator = self.stack.enter_context(
                 PersistentWorker(
                     command,
-                    env={**env, "PYTHONPATH": src},
+                    env={**env, "PYTHONPATH": pythonpath},
                     stderr=log,
                     timeout=600,
                 )
@@ -131,6 +133,12 @@ def load_runtime(path: Path | None) -> dict[str, Any] | None:
     if model not in ("landmarkt5", "unisign", "shubert"):
         raise ValueError("unsupported runtime model")
     if model == "unisign":
+        extra_paths = config.get("unisign_pythonpath", [])
+        if not isinstance(extra_paths, list) or any(
+            not isinstance(value, str) or os.pathsep in value or not Path(value).is_absolute()
+            or not Path(value).is_dir() for value in extra_paths
+        ):
+            raise ValueError("Uni-Sign dependency paths must be existing absolute directories")
         for key in ("unisign_source", "unisign_tokenizer"):
             if not isinstance(config.get(key), str) or not Path(config[key]).is_dir():
                 raise ValueError(f"missing runtime directory: {key}")
