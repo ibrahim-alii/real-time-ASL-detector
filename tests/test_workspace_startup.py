@@ -28,7 +28,7 @@ def test_workspace_allows_cold_translation_startup_without_extending_requests(
     config = dict.fromkeys(
         ("python", "extraction_python", "checkpoint", *module.ASSET_NAMES), "fixture"
     )
-    config["work_root"] = str(tmp_path)
+    config.update(work_root=str(tmp_path), model="shubert", shubert_model_root="fixture")
     runtime = module.WarmRuntime(config)
     try:
         assert workers[1].startup_timeout == 600
