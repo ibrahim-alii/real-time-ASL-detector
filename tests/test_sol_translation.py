@@ -24,6 +24,19 @@ from asl_recognizer.translation.model import encoded_values
 from asl_recognizer.translation.sol_common import capacity, read_json, write_json
 
 
+def test_sol_runtime_checks_extractor_without_legacy_training(tmp_path):
+    from asl_recognizer.translation.sol_pipeline import Pipeline
+
+    calls = []
+    pipeline = SimpleNamespace(
+        extract=tmp_path / "extract-python", reports=tmp_path,
+        assets=lambda: ["--pose-config", "fixture"], worker=lambda *args: calls.append(args),
+    )
+    Pipeline.runtime_stage(pipeline)
+    assert len(calls) == 1
+    assert calls[0][:2] == (pipeline.extract, "runtime-check")
+
+
 def test_benchmark_budgets_slower_corpus_and_measured_checkpoint(tmp_path, monkeypatch):
     from asl_recognizer.translation import sol_training
 
