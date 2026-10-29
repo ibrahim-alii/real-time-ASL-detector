@@ -746,6 +746,20 @@ def controller_fixture(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
     return config_path, Path(config["durable_root"]), submissions
 
 
+@pytest.mark.parametrize("stage", sol.STAGES[9:])
+def test_controller_does_not_submit_retired_stages(tmp_path, monkeypatch, stage):
+    config, root, submissions = controller_fixture(tmp_path, monkeypatch)
+    state = sol.advance(config, "run")
+    state.pop("job_id")
+    state.update(stage_index=sol.STAGES.index(stage), status="ready")
+    write_json(root / "controller.json", state)
+    result = sol.advance(config, "resume")
+    assert result["status"] == "retired"
+    assert result["stage"] == stage
+    assert read_json(root / "controller.json")["stage_index"] == sol.STAGES.index(stage)
+    assert submissions == ["bootstrap"]
+
+
 def test_controller_running_unknown_and_failed_jobs_never_duplicate(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
     config, _root, submissions = controller_fixture(tmp_path, monkeypatch)
     first = sol.advance(config, "run")
