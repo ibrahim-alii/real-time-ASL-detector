@@ -21,7 +21,6 @@ from ..features.mmpose_backend import MMPoseWholeBodyBackend
 from ..features.video import iter_every_other_video_frame
 from .cache import TranslationFeatureCache
 from .data_audit import audit_manifest, read_signer_map
-from .evaluation import evaluate_checkpoint
 from .features import mmpose_translation_request
 from .how2sign import build_how2sign_manifest
 from .local_runtime import OverlayWriter, extractor_identity
@@ -443,6 +442,8 @@ def main(argv: list[str] | None = None) -> int:
         or args.bleurt_checkpoint != "BLEURT-20"
     ):
         raise ValueError("paper evaluation requires beam 5, SacreBLEU v2, and BLEURT-20")
+    from .evaluation import evaluate_checkpoint
+
     evaluate_checkpoint(
         checkpoint=args.checkpoint,
         manifest_path=args.manifest,
