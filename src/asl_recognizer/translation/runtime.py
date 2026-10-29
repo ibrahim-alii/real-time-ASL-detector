@@ -20,7 +20,6 @@ from ..features.mmpose_backend import MMPoseWholeBodyBackend, WholeBodyFrame
 from ..features.video import iter_video_frames
 from .cache import TranslationFeatureCache
 from .contracts import DirectTranslationResult, TranslationRequest
-from .experiment import checkpoint_model_config
 from .features import mmpose_translation_request
 from .local_runtime import OverlayWriter, extractor_identity
 from .model import LandmarkT5
@@ -121,6 +120,8 @@ class ExtractionEngine:
 class TranslationEngine:
     def __init__(self, checkpoint: Path, *, device: str = "cuda:0") -> None:
         from transformers import AutoTokenizer
+
+        from .experiment import checkpoint_model_config
 
         started = time.perf_counter()
         self.checkpoint_sha256 = file_hash(checkpoint)
