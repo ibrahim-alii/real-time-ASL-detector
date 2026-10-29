@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
 
-from asl_recognizer.translation import evaluation, experiment, recorded
+from asl_recognizer.translation import recorded
 from asl_recognizer.translation.cache import TranslationFeatureCache
-from asl_recognizer.translation.contracts import DirectTranslationResult, TranslationRequest
-from asl_recognizer.translation.experiment import ExperimentConfig
+from asl_recognizer.translation.contracts import TranslationRequest
 from asl_recognizer.translation.manifest import build_manifest, write_manifest
 from asl_recognizer.translation.review import export_review, review_gate
 from asl_recognizer.translation.schema import MMPOSE_SCHEMA
@@ -142,28 +139,6 @@ def test_review_requires_complete_identified_reviews(tmp_path: Path) -> None:
         review_gate(review, manifest_path=path)
 
 
-class Tokenizer:
-    pad_token_id = 0
-
-    def __call__(self, texts: list[str], **_kwargs: object) -> dict[str, torch.Tensor]:
-        return {"input_ids": torch.tensor([[1] for _ in texts])}
-
-
-class Model(torch.nn.Module):
-    def __init__(self, _config: object) -> None:
-        super().__init__()
-        self.layer = torch.nn.Linear(266, 2)
-
-    def forward(
-        self, values: torch.Tensor, mask: torch.Tensor, labels: torch.Tensor
-    ) -> torch.Tensor:
-        pooled = (values * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True)
-        return torch.nn.functional.cross_entropy(self.layer(pooled), labels[:, 0])
-
-    def translate(self, _request: object, _tokenizer: object, *, device: str):  # type: ignore[no-untyped-def]
-        return DirectTranslationResult("this is a complete sentence", None, "tiny", "test", 1.0)
-
-
 def source(tmp_path: Path, name: str) -> Path:
     manifest = build_manifest(
         [
@@ -198,33 +173,6 @@ def source(tmp_path: Path, name: str) -> Path:
             },
         )
     return path
-
-
-@pytest.fixture
-def tiny(monkeypatch):  # type: ignore[no-untyped-def]
-    from transformers import AutoTokenizer, optimization
-
-    monkeypatch.setattr(experiment, "LandmarkT5", Model)
-    monkeypatch.setattr(evaluation, "LandmarkT5", Model)
-    monkeypatch.setattr(AutoTokenizer, "from_pretrained", lambda *_a, **_k: Tokenizer())
-    monkeypatch.setattr(
-        optimization, "Adafactor", lambda params, **_k: torch.optim.SGD(params, lr=0.001)
-    )
-
-
-def cpu_config(**kwargs: object) -> ExperimentConfig:
-    return replace(
-        ExperimentConfig(),
-        batch_size=2,
-        microbatch_size=1,
-        precision="fp32",
-        gradient_checkpointing=False,
-        youtube_steps=2,
-        how2sign_steps=2,
-        validation_interval=1,
-        checkpoint_interval=1,
-        **kwargs,
-    )
 
 
 def test_recorded_extraction_interval_mask_and_overlay(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
