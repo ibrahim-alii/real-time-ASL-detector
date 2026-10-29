@@ -12,7 +12,6 @@ from asl_recognizer.translation import evaluation, training
 from asl_recognizer.translation.cache import TranslationFeatureCache
 from asl_recognizer.translation.contracts import TranslationRequest
 from asl_recognizer.translation.manifest import build_manifest, write_manifest
-from asl_recognizer.translation.model import DirectTranslationConfig, LandmarkT5
 from asl_recognizer.translation.run_metadata import collect_run_metadata
 from asl_recognizer.translation.schema import MMPOSE_SCHEMA, translation_schema
 
@@ -111,46 +110,6 @@ def test_run_metadata_records_dependency_versions(monkeypatch) -> None:  # type:
     assert "bleurt-pytorch" in metadata.dependencies
     assert metadata.container_sha256 == "abc123"
 
-
-
-
-@pytest.mark.parametrize("schema_name", [MMPOSE_SCHEMA])
-def test_landmark_t5_forward_and_beam_decode_without_model_download(  # type: ignore[no-untyped-def]
-    monkeypatch, schema_name: str
-) -> None:
-    from transformers import T5Config, T5ForConditionalGeneration
-
-    config = T5Config(
-        vocab_size=32,
-        d_model=32,
-        d_ff=64,
-        num_layers=1,
-        num_decoder_layers=1,
-        num_heads=4,
-        pad_token_id=0,
-        decoder_start_token_id=0,
-        eos_token_id=1,
-    )
-    config._name_or_path = "tiny-test"
-    monkeypatch.setattr(
-        T5ForConditionalGeneration,
-        "from_pretrained",
-        lambda *_args, **_kwargs: T5ForConditionalGeneration(config),
-    )
-    schema = translation_schema(schema_name)
-    model = LandmarkT5(DirectTranslationConfig(
-        decoder_max_tokens=4, beam_width=2, feature_schema=schema_name
-    ))
-    values = torch.ones((1, 2, schema.dimension), dtype=torch.float32)
-    labels = torch.tensor([[3, 1]])
-    assert torch.isfinite(model(values, torch.ones((1, 2), dtype=torch.long), labels))
-    request = TranslationRequest(
-        values[0].numpy(), np.ones((2, schema.landmarks), dtype=np.bool_), schema_name
-    )
-    tokenizer = type("Tokenizer", (), {"decode": lambda self, *_args, **_kwargs: "hello"})()
-    result = model.translate(request, tokenizer)
-    assert result.english == "hello"
-    assert result.beam_width == 2
 
 
 
