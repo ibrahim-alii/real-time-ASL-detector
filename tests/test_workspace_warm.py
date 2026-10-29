@@ -138,3 +138,49 @@ def test_server_can_replace_failed_workers(tmp_path, monkeypatch):
     assert first.close.called and server.warm is None
     assert server.ensure_warm() is instances[1] and len(instances) == 2
     server.server_close()
+
+
+def test_unisign_worker_receives_native_pose_and_reports_identity(tmp_path, monkeypatch):
+    module = workspace()
+    workers = []
+
+    class Worker:
+        def __init__(self, command, **kwargs):
+            self.command, self.calls = command, []
+            workers.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def request(self, item):
+            self.calls.append(item)
+            if "video" in item:
+                return {"extraction_seconds": 0.1}
+            return {
+                "english": "hello",
+                "identity": {"checkpoint_sha256": "a" * 64, "source_revision": "rev"},
+            }
+
+    monkeypatch.setattr(module, "PersistentWorker", Worker)
+    config = dict.fromkeys(
+        ("python", "extraction_python", "checkpoint", *module.ASSET_NAMES), "fixture"
+    )
+    config.update(
+        work_root=str(tmp_path),
+        model="unisign",
+        unisign_source="source",
+        unisign_tokenizer="tokenizer",
+    )
+    runtime = module.WarmRuntime(config)
+    try:
+        result = runtime.infer(tmp_path, tmp_path / "video", tmp_path / "overlay")
+        assert "asl_recognizer.translation.unisign" in workers[1].command
+        assert "--source" in workers[1].command and "--tokenizer" in workers[1].command
+        assert workers[0].calls[0]["native_pose"] is True
+        assert result["model_id"] == "uni-sign" and result["model_version"] == "rev"
+        assert result["checkpoint_sha256"] == "a" * 64
+    finally:
+        runtime.close()
