@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from .cache import TranslationFeatureCache
+from .cache import TranslationFeatureCache, preprocessing_contract
 from .evaluation import evaluate_translations
 from .manifest import read_manifest
 from .model import T5_MODEL_ID, T5_REVISION, DirectTranslationConfig, LandmarkT5
@@ -103,24 +103,6 @@ def checkpoint_model_config(saved: dict[str, Any]) -> DirectTranslationConfig:
         decoder_max_tokens=config.get("decoder_tokens", 128),
         input_encoding=config.get("input_encoding", "sentinel-v1"),
     )
-
-
-def preprocessing_contract(paths: dict[str, Path], features: Path) -> dict[str, Any] | None:
-    """Require one input contract across training and development, without opening test data."""
-    contracts: dict[str, dict[str, Any] | None] = {}
-    for source, path in paths.items():
-        cache = TranslationFeatureCache(features / source)
-        for row in read_manifest(path).accepted():
-            if row.split not in {"train", "dev"}:
-                continue
-            _, metadata = cache.load(row.clip_id)
-            current = metadata.get("preprocessing")
-            if current is not None and (not isinstance(current, dict) or not current):
-                raise ValueError("invalid preprocessing contract")
-            contracts[json.dumps(current, sort_keys=True, allow_nan=False)] = current
-    if len(contracts) != 1:
-        raise ValueError("train and dev features require one consistent preprocessing contract")
-    return next(iter(contracts.values()))
 
 
 def _dev(
