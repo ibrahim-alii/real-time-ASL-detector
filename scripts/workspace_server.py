@@ -64,7 +64,11 @@ class WarmRuntime:
                     stderr=log,
                 )
             )
-            if self.model == "unisign":
+            if self.model == "shubert":
+                command = [config["python"], str(Path(__file__).with_name("shubert_worker.py")),
+                           "--work-root", config["work_root"], "--model-root",
+                           config["shubert_model_root"]]
+            elif self.model == "unisign":
                 command = [config["python"], "-m", "asl_recognizer.translation.unisign",
                            "--work-root", config["work_root"], "--source", config["unisign_source"],
                            "--tokenizer", config["unisign_tokenizer"], "--checkpoint",
@@ -95,7 +99,8 @@ class WarmRuntime:
              "native_pose": self.model == "unisign"}
         )
         tick = time.perf_counter()
-        result = self.translator.request({"features": str(features)})
+        request = {"video": str(video)} if self.model == "shubert" else {"features": str(features)}
+        result = self.translator.request(request)
         if self.model == "unisign":
             result = {**result, "model_id": "uni-sign",
                       "model_version": result["identity"]["source_revision"],
@@ -123,7 +128,7 @@ def load_runtime(path: Path | None) -> dict[str, Any] | None:
         raise ValueError("inference requires a Sol Slurm GPU allocation; omit config for preview")
     config: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     model = config.get("model", "landmarkt5")
-    if model not in ("landmarkt5", "unisign"):
+    if model not in ("landmarkt5", "unisign", "shubert"):
         raise ValueError("unsupported runtime model")
     if model == "unisign":
         for key in ("unisign_source", "unisign_tokenizer"):
@@ -131,7 +136,19 @@ def load_runtime(path: Path | None) -> dict[str, Any] | None:
                 raise ValueError(f"missing runtime directory: {key}")
         if config.get("warm_workers", True) is not True:
             raise ValueError("Uni-Sign requires warm workers")
-    for key in ("python", "extraction_python", "checkpoint", *ASSET_NAMES):
+    if model == "shubert":
+        value = config.get("shubert_model_root")
+        if (not isinstance(value, str) or not Path(value).resolve().is_relative_to(Path("/scratch"))
+                or not Path(value).is_dir()):
+            raise ValueError("SHuBERT requires an existing Sol scratch model root")
+        if config.get("warm_workers", True) is not True:
+            raise ValueError("SHuBERT requires warm workers")
+        if shutil.which("ffprobe") is None:
+            raise ValueError("ffprobe must be available in the Sol job")
+    files = ("python", "extraction_python", *ASSET_NAMES)
+    if model != "shubert":
+        files += ("checkpoint",)
+    for key in files:
         if not isinstance(config.get(key), str) or not Path(config[key]).is_file():
             raise ValueError(f"missing runtime file: {key}")
     root = Path(config["work_root"]).resolve()
