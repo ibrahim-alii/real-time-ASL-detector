@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import argparse
 import math
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
 
 from .cache import TranslationFeatureCache
-from .comparison import development_rows
 from .contracts import TranslationRequest
 from .evaluation import evaluate_translations
-from .manifest import read_manifest
 from .model import encoded_values
-from .runtime import TranslationEngine, require_sol
-from .sol_common import write_json
 
 
 def derangement(count: int, seed: int) -> list[int]:
@@ -194,66 +188,3 @@ def input_profile(
         "feature_payload_budget_bytes": cache.max_memory_bytes,
     }
 
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("checkpoint", "manifest", "features", "output", "work-root"):
-        parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--max-examples", type=int, default=8)
-    parser.add_argument("--wall-time-seconds", type=float, default=900)
-    args = parser.parse_args(argv)
-    require_sol(args.work_root)
-    if args.output.exists() or not args.output.resolve().is_relative_to(args.work_root.resolve()):
-        raise ValueError("diagnostic output must be new and within the Sol work root")
-    if not 2 <= args.max_examples <= 32:
-        raise ValueError("diagnostic example cap must be between 2 and 32")
-    started = time.monotonic()
-    manifest = read_manifest(args.manifest)
-    rows = development_rows(manifest, args.max_examples)
-    engine = TranslationEngine(args.checkpoint)
-    saved = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
-    if saved["manifest_hashes"]["how2sign"] != manifest.fingerprint:
-        raise ValueError("diagnostic checkpoint and manifest differ")
-    provenance = {
-        "checkpoint_step": saved["global_step"],
-        "checkpoint_exposure": saved.get("exposure", "unavailable in legacy checkpoint"),
-        "checkpoint_input_encoding": engine.config.input_encoding,
-        "preprocessing_status": saved["config"].get("preprocessing_status", "legacy-unversioned"),
-    }
-    del saved
-    cache = TranslationFeatureCache(args.features / "how2sign")
-    examples = []
-    for row in rows:
-        request, metadata = cache.load(row.clip_id)
-        expected = {
-            "manifest_hash": manifest.fingerprint,
-            "caption": row.caption,
-            "source": "how2sign",
-            "split": "dev",
-            "extractor": engine.extractor,
-        }
-        if engine.preprocessing is not None:
-            expected["preprocessing"] = engine.preprocessing
-        if any(metadata.get(key) != value for key, value in expected.items()):
-            raise ValueError("diagnostic feature identity differs")
-        examples.append((request, row.caption))
-    remaining = args.wall_time_seconds - (time.monotonic() - started)
-    report = conditioning_report(
-        engine.model, engine.tokenizer, examples, device=engine.device, wall_time_seconds=remaining
-    )
-    profile = input_profile(cache, rows[0].clip_id, rows[0].caption, engine.tokenizer)
-    write_json(
-        args.output,
-        {
-            **report,
-            **provenance,
-            "checkpoint_sha256": engine.checkpoint_sha256,
-            "manifest_hash": manifest.fingerprint,
-            "input_profile": profile,
-            "elapsed_seconds": time.monotonic() - started,
-        },
-    )
-
-
-if __name__ == "__main__":
-    main()
