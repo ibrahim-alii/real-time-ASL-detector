@@ -122,6 +122,19 @@ def test_runtime_requires_slurm(workspace: ModuleType, monkeypatch: pytest.Monke
         workspace.load_runtime(Path("does-not-exist.json"))
 
 
+def test_workspace_rejects_legacy_model_and_cold_inference(
+    workspace: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(workspace.sys, "platform", "linux")
+    monkeypatch.setenv("SLURM_JOB_ID", "1")
+    config = tmp_path / "runtime.json"
+    config.write_text(json.dumps({"model": "landmarkt5"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="unsupported runtime model"):
+        workspace.load_runtime(config)
+    with pytest.raises(ValueError, match="requires warm workers"):
+        workspace.translate_clip(b"synthetic", {"work_root": str(tmp_path)})
+
+
 def test_overlay_sidecar_preserves_pixel_coordinates_and_masks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
