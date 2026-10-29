@@ -24,44 +24,6 @@ def test_stream_overlay_releases_writer_and_preserves_timing(tmp_path, monkeypat
     assert writer.release.called
 
 
-def test_translation_engine_loads_once_and_checks_identity(tmp_path, monkeypatch):
-    import sys
-    from types import SimpleNamespace
-
-    import torch
-
-    from asl_recognizer.translation import model as legacy_model
-    from asl_recognizer.translation import runtime
-
-    path = tmp_path / "checkpoint.pt"
-    torch.save(
-        {
-            "config": {
-                "feature_schema": "mmpose-coco-wholebody-133-xy-v1",
-                "extractor": {"fixture": True},
-            },
-            "model": {},
-        },
-        path,
-    )
-    model = MagicMock()
-    model.to.return_value = model
-    model.eval.return_value = model
-    constructor = MagicMock(return_value=model)
-    monkeypatch.setattr(legacy_model, "LandmarkT5", constructor)
-    monkeypatch.setattr(runtime, "LandmarkT5", constructor, raising=False)
-    tokenizer = SimpleNamespace(from_pretrained=lambda *a, **k: object())
-    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=tokenizer))
-    engine = runtime.TranslationEngine(path, device="cpu")
-    request = object()
-    engine.translate(request, {"extractor": {"fixture": True}})
-    engine.translate(request, {"extractor": {"fixture": True}})
-    assert constructor.call_count == 1
-    assert model.translate.call_count == 2
-    with pytest.raises(ValueError, match="extractor"):
-        engine.translate(request, {"extractor": {"changed": True}})
-
-
 def test_extraction_engine_streams_and_reuses_backend(tmp_path, monkeypatch):
     import cv2
 
@@ -124,26 +86,17 @@ def test_worker_paths_cannot_escape_session(tmp_path):
     assert request_path(tmp_path, str(tmp_path / "result")) == tmp_path / "result"
 
 
-@pytest.mark.parametrize("role", ["extract", "translate"])
-def test_runtime_cli_dispatches_synthetic_requests(tmp_path, monkeypatch, role):
+def test_runtime_cli_dispatches_synthetic_requests(tmp_path, monkeypatch):
     import io
     import json
     import sys
 
     from asl_recognizer.translation import runtime
-    from asl_recognizer.translation.contracts import DirectTranslationResult
 
     monkeypatch.setattr(runtime, "require_sol", lambda root: None)
     engine = MagicMock()
     engine.extract.return_value = {"sampled_frames": 2}
-    engine.translate.return_value = DirectTranslationResult("fixture", None, "tiny", "test", 1.0)
-    engine.checkpoint_sha256 = "fixture"
-    engine.initialization_seconds = 1.0
     monkeypatch.setattr(runtime, "ExtractionEngine", lambda *a, **k: engine)
-    monkeypatch.setattr(runtime, "TranslationEngine", lambda *a, **k: engine)
-    cache = MagicMock()
-    cache.load.return_value = (object(), {})
-    monkeypatch.setattr(runtime, "TranslationFeatureCache", lambda *a: cache)
     assets = tmp_path / "assets.json"
     assets.write_text(json.dumps({"assets": {}}))
     item = {
@@ -160,20 +113,17 @@ def test_runtime_cli_dispatches_synthetic_requests(tmp_path, monkeypatch, role):
     runtime.main(
         [
             "--role",
-            role,
+            "extract",
             "--work-root",
             str(tmp_path),
             "--assets-json",
             str(assets),
-            "--checkpoint",
-            str(tmp_path / "checkpoint"),
         ]
     )
     rows = [json.loads(line) for line in outgoing.getvalue().splitlines()]
     assert rows[-1]["ok"] is True
     assert rows[-1]["id"] == "one"
-    if role == "extract":
-        assert engine.close.called
+    assert engine.close.called
 
 
 def test_runtime_refuses_real_work_without_allocation(tmp_path, monkeypatch):
