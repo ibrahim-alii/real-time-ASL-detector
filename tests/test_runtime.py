@@ -25,8 +25,10 @@ def test_stream_overlay_releases_writer_and_preserves_timing(tmp_path, monkeypat
 
 
 def test_translation_engine_loads_once_and_checks_identity(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
     import torch
-    from transformers import AutoTokenizer
 
     from asl_recognizer.translation import runtime
 
@@ -46,7 +48,8 @@ def test_translation_engine_loads_once_and_checks_identity(tmp_path, monkeypatch
     model.eval.return_value = model
     constructor = MagicMock(return_value=model)
     monkeypatch.setattr(runtime, "LandmarkT5", constructor)
-    monkeypatch.setattr(AutoTokenizer, "from_pretrained", lambda *a, **k: object())
+    tokenizer = SimpleNamespace(from_pretrained=lambda *a, **k: object())
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=tokenizer))
     engine = runtime.TranslationEngine(path, device="cpu")
     request = object()
     engine.translate(request, {"extractor": {"fixture": True}})
