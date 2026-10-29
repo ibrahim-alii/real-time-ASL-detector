@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "asl-recognizer"
 version = "0.1.0"
-description = "Recorded ASL-to-English translation from MMPose landmarks"
+description = "Recorded ASL-to-English translation using pretrained sign-language models"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "numpy>=2.0,<3",
