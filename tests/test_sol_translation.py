@@ -37,6 +37,14 @@ def test_sol_runtime_checks_extractor_without_legacy_training(tmp_path):
     assert calls[0][:2] == (pipeline.extract, "runtime-check")
 
 
+@pytest.mark.parametrize("stage", sol.STAGES[9:])
+def test_sol_pipeline_rejects_retired_stages(stage):
+    from asl_recognizer.translation.sol_pipeline import Pipeline
+
+    with pytest.raises(ValueError, match="retired"):
+        Pipeline.stage(SimpleNamespace(), stage)
+
+
 def test_benchmark_budgets_slower_corpus_and_measured_checkpoint(tmp_path, monkeypatch):
     from asl_recognizer.translation import sol_training
 
