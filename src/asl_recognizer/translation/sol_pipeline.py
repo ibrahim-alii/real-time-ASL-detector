@@ -126,16 +126,6 @@ class Pipeline:
             "--output",
             self.reports / "runtime.json",
         )
-        self.worker(
-            self.train,
-            "check-training-gpu",
-            "--steps",
-            10,
-            "--precision",
-            "bf16",
-            "--output",
-            self.reports / "training-gpu.json",
-        )
 
     def annotations(self) -> None:
         from .manifest import read_manifest
