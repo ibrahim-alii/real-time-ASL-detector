@@ -126,6 +126,13 @@ def test_runtime_cli_dispatches_synthetic_requests(tmp_path, monkeypatch):
     assert engine.close.called
 
 
+def test_runtime_rejects_legacy_translation_role(tmp_path):
+    from asl_recognizer.translation import runtime
+
+    with pytest.raises(SystemExit):
+        runtime.main(["--role", "translate", "--work-root", str(tmp_path)])
+
+
 def test_runtime_refuses_real_work_without_allocation(tmp_path, monkeypatch):
     from asl_recognizer.translation.runtime import require_sol
 
