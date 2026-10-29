@@ -12,7 +12,7 @@ import torch
 from .cache import TranslationFeatureCache
 from .contracts import TranslationRequest
 from .evaluation import evaluate_translations
-from .model import encoded_values
+from .training import encoded_values
 
 
 def derangement(count: int, seed: int) -> list[int]:
