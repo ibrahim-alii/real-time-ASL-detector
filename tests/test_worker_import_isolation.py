@@ -30,3 +30,11 @@ def test_worker_evaluate_dispatches_to_evaluation(monkeypatch):
         checkpoint=Path("checkpoint"), manifest_path=Path("manifest"),
         features=Path("features"), output=Path("output"), split="dev", with_bleurt=False,
     )
+
+
+def test_worker_retires_legacy_gpu_check():
+    from asl_recognizer.translation import worker
+
+    commands = worker._parser()._subparsers._group_actions[0].choices
+    assert "check-training-gpu" not in commands
+    assert "runtime-check" in commands
