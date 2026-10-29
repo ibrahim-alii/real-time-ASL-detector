@@ -5,7 +5,7 @@
 - Compare pretrained ASL translation models using common development clips and input controls.
 - Adapt promising models on verified YouTube-ASL and realigned How2Sign clips on Sol.
 - Evaluate translation and meaning preservation before scaling training or enabling continuous captions.
-- The camera workspace routes to experimental LandmarkT5, Uni-Sign and SHuBERT paths; real Sol parity is pending.
+- The camera workspace routes to experimental Uni-Sign and SHuBERT models; one-clip Sol parity passed for each.
 
 ## Where we are
 
@@ -74,6 +74,10 @@ Keep this configuration outside version control. It must name existing absolute 
 
 ```json
 {
+  "model": "unisign",
+  "unisign_source": "/path/to/pinned-unisign-source",
+  "unisign_tokenizer": "/path/to/verified-tokenizer",
+  "unisign_pythonpath": ["/path/to/offline-dependencies"],
   "python": "/path/to/translation-environment/bin/python",
   "extraction_python": "/path/to/mmpose-environment/bin/python",
   "checkpoint": "/path/to/selected-checkpoint.pt",
@@ -85,12 +89,13 @@ Keep this configuration outside version control. It must name existing absolute 
 }
 ```
 
-To select Uni-Sign, add `"model": "unisign"`, `"unisign_source"` (the pinned official source directory),
-and `"unisign_tokenizer"` (the verified tokenizer directory), and use the released Uni-Sign checkpoint.
+For Uni-Sign, use the released checkpoint and the pinned source and tokenizer directories shown above.
+Include any required existing offline dependency directories in `"unisign_pythonpath"`.
 To select SHuBERT, add `"model": "shubert"` and `"shubert_model_root"` (the verified Sol
 scratch asset directory). The pinned checkpoint is loaded from that directory. Its worker uses
 the separate `"python"` environment; MMPose extraction supplies the display overlay.
-The default remains LandmarkT5 until replacement inference is verified.
+SHuBERT is the default model; select Uni-Sign explicitly as shown above. Both require warm workers.
+Older LandmarkT5 workspace configurations must be replaced with a supported model configuration.
 
 The server environment needs OpenCV and `ffmpeg` with H.264 support. Use this updated source on Sol;
 the extractor and checkpoint identities must match. Forward local port 8765 to the allocated node's
