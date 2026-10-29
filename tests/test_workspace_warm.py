@@ -184,3 +184,48 @@ def test_unisign_worker_receives_native_pose_and_reports_identity(tmp_path, monk
         assert result["checkpoint_sha256"] == "a" * 64
     finally:
         runtime.close()
+
+
+def test_unisign_dependencies_only_apply_to_translator(tmp_path, monkeypatch):
+    import os
+
+    module = workspace()
+    workers = []
+
+    class Worker:
+        def __init__(self, command, **kwargs):
+            self.env = kwargs["env"]
+            workers.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(module, "PersistentWorker", Worker)
+    config = dict.fromkeys(
+        ("python", "extraction_python", "checkpoint", *module.ASSET_NAMES), "fixture"
+    )
+    paths = [str(tmp_path / "deps"), str(tmp_path / "protobuf")]
+    config.update(work_root=str(tmp_path), model="unisign", unisign_source="source",
+                  unisign_tokenizer="tokenizer", unisign_pythonpath=paths)
+    runtime = module.WarmRuntime(config)
+    try:
+        assert workers[1].env["PYTHONPATH"].split(os.pathsep)[1:] == paths
+        assert workers[0].env["PYTHONPATH"].split(os.pathsep)[1:] == []
+    finally:
+        runtime.close()
+
+
+def test_unisign_rejects_invalid_dependency_config(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    module = workspace()
+    monkeypatch.setattr(module, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setenv("SLURM_JOB_ID", "1")
+    config = tmp_path / "config.json"
+    for value in ("/tmp", ["relative"], [str(tmp_path / "missing")]):
+        config.write_text(json.dumps({"model": "unisign", "unisign_pythonpath": value}))
+        with pytest.raises(ValueError, match="dependency paths"):
+            module.load_runtime(config)
