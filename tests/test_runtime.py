@@ -30,6 +30,7 @@ def test_translation_engine_loads_once_and_checks_identity(tmp_path, monkeypatch
 
     import torch
 
+    from asl_recognizer.translation import model as legacy_model
     from asl_recognizer.translation import runtime
 
     path = tmp_path / "checkpoint.pt"
@@ -47,7 +48,8 @@ def test_translation_engine_loads_once_and_checks_identity(tmp_path, monkeypatch
     model.to.return_value = model
     model.eval.return_value = model
     constructor = MagicMock(return_value=model)
-    monkeypatch.setattr(runtime, "LandmarkT5", constructor)
+    monkeypatch.setattr(legacy_model, "LandmarkT5", constructor)
+    monkeypatch.setattr(runtime, "LandmarkT5", constructor, raising=False)
     tokenizer = SimpleNamespace(from_pretrained=lambda *a, **k: object())
     monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=tokenizer))
     engine = runtime.TranslationEngine(path, device="cpu")
