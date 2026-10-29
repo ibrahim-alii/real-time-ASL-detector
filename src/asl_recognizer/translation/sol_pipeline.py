@@ -23,7 +23,7 @@ from .acquisition import (
     recording_archive_groups,
     write_csv,
 )
-from .sol import STAGES, remaining, run_command, validate_config
+from .sol import RETIRED_STAGES, STAGES, remaining, run_command, validate_config
 from .sol_common import (
     GIB,
     capacity,
@@ -454,105 +454,9 @@ class Pipeline:
         )
         return None
 
-    def smoke(self) -> None:
-        from .sol_training import smoke
-
-        smoke(self)
-
-    def benchmark(self) -> None:
-        from .sol_training import benchmark
-
-        benchmark(self)
-
-    def training(self, ablation: bool = False) -> str | None:
-        from .sol_training import train
-
-        return train(self, ablation=ablation)
-
-    def finalize(self, ablation: bool = False) -> None:
-        run = self.root / "runs" / ("mask-ablation" if ablation else "baseline")
-        if ablation and not run.exists():
-            return
-        selected = run / "selected.pt"
-        if not selected.exists():
-            self.worker(self.train, "finalize", "--run", run, "--output", selected)
-        report = run / "dev/report.json"
-        if not report.exists():
-            self.worker(
-                self.train,
-                "evaluate",
-                "--checkpoint",
-                selected,
-                "--manifest",
-                self.manifests / "how2sign.csv",
-                "--features",
-                self.features,
-                "--split",
-                "dev",
-                "--metrics",
-                "basic",
-                "--output",
-                run / "dev",
-            )
-
-    def diagnostic(self) -> None:
-        from .sol_training import diagnostic
-
-        diagnostic(self)
-
-    def recorded_inference(self) -> None:
-        import numpy as np
-
-        from .cache import TranslationFeatureCache
-        from .manifest import read_manifest
-
-        dev_rows = read_manifest(self.manifests / "how2sign.csv").accepted("dev")
-        rows = sorted(dev_rows, key=lambda row: hashlib.sha256(
-            f"{self.config['seed']}:{row.clip_id}".encode()
-        ).hexdigest())[:5]
-        if len(rows) != 5:
-            raise ValueError("recorded inference requires five accepted dev clips")
-        checkpoint = self.root / "runs/baseline/selected.pt"
-        cache = TranslationFeatureCache(self.features / "how2sign")
-        results = []
-        for row in rows:
-            name = hashlib.sha256(row.clip_id.encode()).hexdigest()
-            output = self.scratch / "recorded" / f"{name}.json"
-            overlay = self.scratch / "overlays/recorded" / f"{name}.mp4"
-            video = self.scratch / "how2sign/recordings/dev" / f"{row.video_id}.mp4"
-            if not output.exists():
-                self.worker(
-                    self.train, "infer-video", *self.assets(),
-                    "--checkpoint", checkpoint, "--video", video, "--output", output,
-                    "--extraction-python", self.extract, "--device", "cuda:0",
-                    "--start-ms", row.start_ms, "--end-ms", row.end_ms,
-                    "--overlay", overlay,
-                )
-            report = read_json(output)
-            if (report["checkpoint_sha256"] != file_hash(checkpoint)
-                    or report["extraction"]["source_video_hash"] != file_hash(video)
-                    or not overlay.is_file()):
-                raise ValueError("recorded inference artifact identity changed or overlay missing")
-            actual, metadata = TranslationFeatureCache(
-                output.parent / (output.stem + "-features")
-            ).load("recorded")
-            expected, expected_metadata = cache.load(row.clip_id)
-            if (metadata["extractor"] != expected_metadata["extractor"]
-                    or not np.array_equal(actual.values, expected.values)
-                    or not np.array_equal(actual.landmark_mask, expected.landmark_mask)):
-                raise ValueError("recorded preprocessing differs from training cache")
-            durable_report = self.reports / "recorded" / f"{name}.json"
-            write_json(durable_report, report)
-            results.append({"clip_id": row.clip_id, "reference": row.caption,
-                            "report": str(durable_report), "overlay": str(overlay),
-                            "preprocessing_exact": True})
-        write_json(self.reports / "recorded-inference.json", {
-            "status": "completed", "clips": results,
-            "checkpoint_sha256": file_hash(checkpoint),
-            "quality_status": "unreviewed engineering experiment",
-        })
-
     def stage(self, name: str) -> str | None:
+        if name in RETIRED_STAGES:
+            raise ValueError("legacy training stage is retired")
         actions: dict[str, Callable[[], str | None]] = {
             "bootstrap": self.bootstrap,
             "runtime": self.runtime_stage,
@@ -563,14 +467,6 @@ class Pipeline:
             "manifests": self.manifests_stage,
             "extract-how2sign": lambda: self.extraction("how2sign"),
             "extract-youtube": lambda: self.extraction("youtube-asl"),
-            "smoke": self.smoke,
-            "benchmark": self.benchmark,
-            "train": self.training,
-            "finalize": self.finalize,
-            "diagnostic": self.diagnostic,
-            "ablation": lambda: self.training(True),
-            "ablation-finalize": lambda: self.finalize(True),
-            "recorded-inference": self.recorded_inference,
         }
         return actions[name]()
 
