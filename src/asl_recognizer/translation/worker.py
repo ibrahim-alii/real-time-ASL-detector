@@ -111,11 +111,6 @@ def _parser() -> argparse.ArgumentParser:
     runtime = commands.add_parser("runtime-check")
     _pose_arguments(runtime)
     runtime.add_argument("--output", type=Path, required=True)
-    hardware = commands.add_parser("check-training-gpu")
-    hardware.add_argument("--steps", type=int, default=10)
-    hardware.add_argument("--frames", type=int, default=256)
-    hardware.add_argument("--precision", choices=("fp16", "bf16"), default="bf16")
-    hardware.add_argument("--output", type=Path, required=True)
     mmpose_people = commands.add_parser("validate-people-mmpose")
     _pose_arguments(mmpose_people)
     mmpose_people.add_argument("--input", type=Path, required=True)
@@ -229,15 +224,6 @@ def _local_command(args: argparse.Namespace) -> int | None:
         from .local_runtime import runtime_check
         write_json(args.output, runtime_check(_assets(args), device=args.device,
                                               threshold=args.keypoint_threshold))
-    elif args.command == "check-training-gpu":
-        from .hardware import check_training_gpu, write_failure
-        try:
-            report = check_training_gpu(steps=args.steps, frames=args.frames,
-                                        precision=args.precision)
-        except (OSError, RuntimeError, ValueError) as error:
-            write_failure(args.output, error)
-            raise
-        write_json(args.output, {"passed": True, **report})
     elif args.command == "validate-people-mmpose":
         from .person_validation import EVIDENCE_FIELDS, annotate_caption_rows
         if args.output.exists():
