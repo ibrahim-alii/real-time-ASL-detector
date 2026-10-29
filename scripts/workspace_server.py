@@ -317,6 +317,7 @@ class WorkspaceHandler(BaseHTTPRequestHandler):
             if self.headers.get("Content-Type", "").split(";")[0] not in {
                 "video/webm", "video/mp4",
             }:
+                self.rfile.read(size)
                 raise ValueError("Use a browser that records WebM or MP4 video.")
         except ValueError as error:
             self.reply(400, {"error": str(error)})
