@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import csv
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 
-from asl_recognizer.translation import recorded
+from asl_recognizer.translation import evaluation, experiment, recorded
+from asl_recognizer.translation.cache import TranslationFeatureCache
+from asl_recognizer.translation.contracts import DirectTranslationResult, TranslationRequest
+from asl_recognizer.translation.experiment import ExperimentConfig
 from asl_recognizer.translation.manifest import build_manifest, write_manifest
 from asl_recognizer.translation.review import export_review, review_gate
+from asl_recognizer.translation.schema import MMPOSE_SCHEMA
 from asl_recognizer.translation.worker import main
 from asl_recognizer.translation.youtube import channel_split, freeze_snapshot, verify_snapshot
 
@@ -134,6 +140,91 @@ def test_review_requires_complete_identified_reviews(tmp_path: Path) -> None:
     write_csv(review, rows)
     with pytest.raises(ValueError, match="differs"):
         review_gate(review, manifest_path=path)
+
+
+class Tokenizer:
+    pad_token_id = 0
+
+    def __call__(self, texts: list[str], **_kwargs: object) -> dict[str, torch.Tensor]:
+        return {"input_ids": torch.tensor([[1] for _ in texts])}
+
+
+class Model(torch.nn.Module):
+    def __init__(self, _config: object) -> None:
+        super().__init__()
+        self.layer = torch.nn.Linear(266, 2)
+
+    def forward(
+        self, values: torch.Tensor, mask: torch.Tensor, labels: torch.Tensor
+    ) -> torch.Tensor:
+        pooled = (values * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True)
+        return torch.nn.functional.cross_entropy(self.layer(pooled), labels[:, 0])
+
+    def translate(self, _request: object, _tokenizer: object, *, device: str):  # type: ignore[no-untyped-def]
+        return DirectTranslationResult("this is a complete sentence", None, "tiny", "test", 1.0)
+
+
+def source(tmp_path: Path, name: str) -> Path:
+    manifest = build_manifest(
+        [
+            {
+                "id": f"{name}-{split}",
+                "video_id": f"{name}-{split}",
+                "start": 0,
+                "end": 1,
+                "caption": "this is a complete sentence",
+                "split": split,
+            }
+            for split in ("train", "dev", "test")
+        ],
+        source=name,
+    )
+    path = tmp_path / f"{name}.csv"
+    write_manifest(path, manifest)
+    cache = TranslationFeatureCache(tmp_path / "features" / name)
+    for row in manifest.records:
+        cache.store(
+            row.clip_id,
+            TranslationRequest(
+                np.ones((2, 266), np.float32), np.ones((2, 133), np.bool_), MMPOSE_SCHEMA
+            ),
+            metadata={
+                "manifest_hash": manifest.fingerprint,
+                "source": name,
+                "split": row.split,
+                "caption": row.caption,
+                "feature_schema": MMPOSE_SCHEMA,
+                "extractor": {"backend": "mmpose", "assets": {"fixture": "asset"}},
+            },
+        )
+    return path
+
+
+@pytest.fixture
+def tiny(monkeypatch):  # type: ignore[no-untyped-def]
+    from transformers import AutoTokenizer, optimization
+
+    monkeypatch.setattr(experiment, "LandmarkT5", Model)
+    monkeypatch.setattr(evaluation, "LandmarkT5", Model)
+    monkeypatch.setattr(AutoTokenizer, "from_pretrained", lambda *_a, **_k: Tokenizer())
+    monkeypatch.setattr(
+        optimization, "Adafactor", lambda params, **_k: torch.optim.SGD(params, lr=0.001)
+    )
+
+
+def cpu_config(**kwargs: object) -> ExperimentConfig:
+    return replace(
+        ExperimentConfig(),
+        batch_size=2,
+        microbatch_size=1,
+        precision="fp32",
+        gradient_checkpointing=False,
+        youtube_steps=2,
+        how2sign_steps=2,
+        validation_interval=1,
+        checkpoint_interval=1,
+        **kwargs,
+    )
 
 
 def test_recorded_extraction_interval_mask_and_overlay(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
