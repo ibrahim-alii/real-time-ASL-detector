@@ -29,6 +29,7 @@ class WarmRuntime:
     def __init__(self, config: dict[str, Any]) -> None:
         started = time.perf_counter()
         self.stack = ExitStack()
+        self.model = config.get("model", "landmarkt5")
         try:
             name = self.stack.enter_context(
                 tempfile.TemporaryDirectory(prefix="asl-workers-", dir=config["work_root"])
@@ -63,16 +64,17 @@ class WarmRuntime:
                     stderr=log,
                 )
             )
+            if self.model == "unisign":
+                command = [config["python"], "-m", "asl_recognizer.translation.unisign",
+                           "--work-root", config["work_root"], "--source", config["unisign_source"],
+                           "--tokenizer", config["unisign_tokenizer"], "--checkpoint",
+                           config["checkpoint"]]
+            else:
+                command = [config["python"], *common, "--role", "translate",
+                           "--checkpoint", config["checkpoint"]]
             self.translator = self.stack.enter_context(
                 PersistentWorker(
-                    [
-                        config["python"],
-                        *common,
-                        "--role",
-                        "translate",
-                        "--checkpoint",
-                        config["checkpoint"],
-                    ],
+                    command,
                     env={**env, "PYTHONPATH": src},
                     stderr=log,
                     timeout=600,
@@ -89,10 +91,15 @@ class WarmRuntime:
         started = time.perf_counter()
         features = root / "features"
         extracted = self.extractor.request(
-            {"video": str(video), "output": str(features), "overlay": str(overlay)}
+            {"video": str(video), "output": str(features), "overlay": str(overlay),
+             "native_pose": self.model == "unisign"}
         )
         tick = time.perf_counter()
         result = self.translator.request({"features": str(features)})
+        if self.model == "unisign":
+            result = {**result, "model_id": "uni-sign",
+                      "model_version": result["identity"]["source_revision"],
+                      "checkpoint_sha256": result["identity"]["checkpoint_sha256"]}
         return {
             **result,
             "quality_status": "unverified",
@@ -115,6 +122,15 @@ def load_runtime(path: Path | None) -> dict[str, Any] | None:
     if sys.platform != "linux" or not os.environ.get("SLURM_JOB_ID"):
         raise ValueError("inference requires a Sol Slurm GPU allocation; omit config for preview")
     config: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    model = config.get("model", "landmarkt5")
+    if model not in ("landmarkt5", "unisign"):
+        raise ValueError("unsupported runtime model")
+    if model == "unisign":
+        for key in ("unisign_source", "unisign_tokenizer"):
+            if not isinstance(config.get(key), str) or not Path(config[key]).is_dir():
+                raise ValueError(f"missing runtime directory: {key}")
+        if config.get("warm_workers", True) is not True:
+            raise ValueError("Uni-Sign requires warm workers")
     for key in ("python", "extraction_python", "checkpoint", *ASSET_NAMES):
         if not isinstance(config.get(key), str) or not Path(config[key]).is_file():
             raise ValueError(f"missing runtime file: {key}")
