@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -29,7 +28,7 @@ class WarmRuntime:
     def __init__(self, config: dict[str, Any]) -> None:
         started = time.perf_counter()
         self.stack = ExitStack()
-        self.model = config.get("model", "landmarkt5")
+        self.model = config.get("model", "shubert")
         try:
             name = self.stack.enter_context(
                 tempfile.TemporaryDirectory(prefix="asl-workers-", dir=config["work_root"])
@@ -74,8 +73,7 @@ class WarmRuntime:
                            "--tokenizer", config["unisign_tokenizer"], "--checkpoint",
                            config["checkpoint"]]
             else:
-                command = [config["python"], *common, "--role", "translate",
-                           "--checkpoint", config["checkpoint"]]
+                raise ValueError("unsupported runtime model")
             pythonpath = os.pathsep.join([src, *config.get("unisign_pythonpath", [])]) \
                 if self.model == "unisign" else src
             self.translator = self.stack.enter_context(
@@ -129,8 +127,8 @@ def load_runtime(path: Path | None) -> dict[str, Any] | None:
     if sys.platform != "linux" or not os.environ.get("SLURM_JOB_ID"):
         raise ValueError("inference requires a Sol Slurm GPU allocation; omit config for preview")
     config: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    model = config.get("model", "landmarkt5")
-    if model not in ("landmarkt5", "unisign", "shubert"):
+    model = config.get("model", "shubert")
+    if model not in ("unisign", "shubert"):
         raise ValueError("unsupported runtime model")
     if model == "unisign":
         extra_paths = config.get("unisign_pythonpath", [])
@@ -173,6 +171,8 @@ def translate_clip(data: bytes, config: dict[str, Any],
     """Bound decoding, reuse checkpoint identity checks, then remove session files."""
     import cv2
 
+    if warm is None:
+        raise ValueError("pretrained translation requires warm workers")
     started = time.perf_counter()
     if shutil.disk_usage(config["work_root"]).free < 2 * 1024**3:
         raise ValueError("Sol scratch needs at least 2 GiB free for a clip")
@@ -194,55 +194,25 @@ def translate_clip(data: bytes, config: dict[str, Any],
                 raise ValueError("record a readable clip of at most 20 seconds")
         finally:
             capture.release()
-        report, overlay = root / "result.json", root / "overlay.mp4"
-        if warm is not None:
-            transcode_ms = (time.perf_counter() - started) * 1000
-            result = warm.infer(root, video, overlay)
-            landmarks = json.loads(overlay.with_suffix(".json").read_text(encoding="utf-8"))
-            total_ms = (time.perf_counter() - started) * 1000
-            return {
-                "english": result["english"],
-                "model_id": result["model_id"],
-                "model_version": result["model_version"],
-                "checkpoint_sha256": result["checkpoint_sha256"],
-                "latency_ms": total_ms,
-                "quality_status": result["quality_status"],
-                "timings": {
-                    **result["timings"],
-                    "transcode_ms": transcode_ms,
-                    "total_ms": total_ms,
-                },
-                "landmarks": {key: landmarks[key] for key in ("width", "height", "frames")},
-            }
-        command = [config["python"], "-m", "asl_recognizer.translation.worker", "infer-video",
-                   "--video", str(video), "--checkpoint", config["checkpoint"],
-                   "--output", str(report), "--overlay", str(overlay),
-                   "--extraction-python", config["extraction_python"], "--device", "cuda:0"]
-        for key in ASSET_NAMES:
-            command.extend(["--" + key.replace("_", "-"), config[key]])
-        env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
-        with subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                              start_new_session=True, env=env) as process:
-            try:
-                code = process.wait(timeout=600)
-            except subprocess.TimeoutExpired:
-                if sys.platform == "linux":
-                    os.killpg(process.pid, signal.SIGKILL)
-                process.wait()
-                raise
-            if code:
-                raise subprocess.CalledProcessError(code, command)
-        result = json.loads(report.read_text(encoding="utf-8"))
+        overlay = root / "overlay.mp4"
+        transcode_ms = (time.perf_counter() - started) * 1000
+        result = warm.infer(root, video, overlay)
         landmarks = json.loads(overlay.with_suffix(".json").read_text(encoding="utf-8"))
-        # Return display data only: no remote filenames, model weights, or cache files.
         total_ms = (time.perf_counter() - started) * 1000
-        return {"english": result["english"], "model_id": result["model_id"],
-                "model_version": result["model_version"], "latency_ms": total_ms,
-                "checkpoint_sha256": result.get("checkpoint_sha256"),
-                "timings": {"total_ms": total_ms, "decode_ms": result["latency_ms"],
-                            "warm_workers": False},
-                "quality_status": result["quality_status"],
-                "landmarks": {key: landmarks[key] for key in ("width", "height", "frames")}}
+        return {
+            "english": result["english"],
+            "model_id": result["model_id"],
+            "model_version": result["model_version"],
+            "checkpoint_sha256": result["checkpoint_sha256"],
+            "latency_ms": total_ms,
+            "quality_status": result["quality_status"],
+            "timings": {
+                **result["timings"],
+                "transcode_ms": transcode_ms,
+                "total_ms": total_ms,
+            },
+            "landmarks": {key: landmarks[key] for key in ("width", "height", "frames")},
+        }
 
 
 class WorkspaceServer(ThreadingHTTPServer):
