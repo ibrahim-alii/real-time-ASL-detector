@@ -8,10 +8,12 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from .contracts import TranslationRequest
+from .manifest import read_manifest
 from .youtube import file_hash
 
 
@@ -119,3 +121,22 @@ class TranslationFeatureCache:
 
     def _digest_path(self, clip_id: str) -> Path:
         return self._path(clip_id).with_suffix(".npz.sha256")
+
+
+def preprocessing_contract(paths: dict[str, Path], features: Path) -> dict[str, Any] | None:
+    """Require one input contract across training and development, without opening test data."""
+    contracts: dict[str, dict[str, Any] | None] = {}
+    for source, path in paths.items():
+        cache = TranslationFeatureCache(features / source)
+        for row in read_manifest(path).accepted():
+            if row.split not in {"train", "dev"}:
+                continue
+            _, metadata = cache.load(row.clip_id)
+            current = metadata.get("preprocessing")
+            if current is not None and (not isinstance(current, dict) or not current):
+                raise ValueError("invalid preprocessing contract")
+            contracts[json.dumps(current, sort_keys=True, allow_nan=False)] = current
+    if len(contracts) != 1:
+        raise ValueError("train and dev features require one consistent preprocessing contract")
+    return next(iter(contracts.values()))
+
