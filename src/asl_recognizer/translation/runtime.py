@@ -1,4 +1,4 @@
-"""Reusable Sol extraction and translation engines with a bounded JSON-line protocol."""
+"""Reusable Sol extraction engine with a bounded JSON-line protocol."""
 from __future__ import annotations
 
 import argparse
@@ -9,17 +9,14 @@ import sys
 import time
 from collections.abc import Callable, Generator
 from contextlib import ExitStack, redirect_stdout
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TextIO, cast
 
 import numpy as np
-import torch
 
 from ..features.mmpose_backend import MMPoseWholeBodyBackend, WholeBodyFrame
 from ..features.video import iter_video_frames
 from .cache import TranslationFeatureCache
-from .contracts import DirectTranslationResult, TranslationRequest
 from .features import mmpose_translation_request
 from .local_runtime import OverlayWriter, extractor_identity
 from .pose_cache import PREPROCESSING, PoseCache, pose_quality
@@ -116,37 +113,6 @@ class ExtractionEngine:
         self.backend.close()
 
 
-class TranslationEngine:
-    def __init__(self, checkpoint: Path, *, device: str = "cuda:0") -> None:
-        from transformers import AutoTokenizer
-
-        from .experiment import checkpoint_model_config
-        from .model import LandmarkT5
-
-        started = time.perf_counter()
-        self.checkpoint_sha256 = file_hash(checkpoint)
-        saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
-        self.config = checkpoint_model_config(saved)
-        if self.config.feature_schema != MMPOSE_SCHEMA:
-            raise ValueError("recorded inference requires an MMPose checkpoint")
-        self.extractor = saved["config"]["extractor"]
-        self.preprocessing = saved["config"].get("preprocessing")
-        self.device = device
-        self.model = LandmarkT5(self.config).to(device).eval()
-        self.model.load_state_dict(saved["model"])
-        self.tokenizer = AutoTokenizer.from_pretrained(self.config.pretrained_model,
-                                                      revision=self.config.pretrained_revision)
-        self.initialization_seconds = time.perf_counter() - started
-
-    def translate(self, request: TranslationRequest,
-                  metadata: dict[str, Any]) -> DirectTranslationResult:
-        if metadata.get("extractor") != self.extractor:
-            raise ValueError("recorded extractor differs from checkpoint")
-        if self.preprocessing is not None and metadata.get("preprocessing") != self.preprocessing:
-            raise ValueError("recorded preprocessing differs from checkpoint")
-        return self.model.translate(request, self.tokenizer, device=self.device)
-
-
 def request_path(root: Path, value: object) -> Path:
     if not isinstance(value, str) or not Path(value).is_absolute():
         raise ValueError("worker path must be absolute within the session root")
@@ -187,10 +153,9 @@ def require_sol(root: Path) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--role", choices=("extract", "translate"), required=True)
+    parser.add_argument("--role", choices=("extract",), required=True)
     parser.add_argument("--work-root", type=Path, required=True)
     parser.add_argument("--assets-json", type=Path)
-    parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--device", default="cuda:0")
     args = parser.parse_args(argv)
@@ -214,19 +179,6 @@ def main(argv: list[str] | None = None) -> None:
             serve(extract, stdin=sys.stdin, stdout=sys.stdout)
         finally:
             engine.close()
-    else:
-        if args.checkpoint is None:
-            parser.error("translation worker requires --checkpoint")
-        with redirect_stdout(sys.stderr):
-            translator = TranslationEngine(args.checkpoint, device=args.device)
-
-        def translate(item: dict[str, Any]) -> dict[str, Any]:
-            root = request_path(args.work_root, item["features"])
-            request, metadata = TranslationFeatureCache(root).load("recorded")
-            return {**asdict(translator.translate(request, metadata)),
-                    "checkpoint_sha256": translator.checkpoint_sha256,
-                    "initialization_seconds": translator.initialization_seconds}
-        serve(translate, stdin=sys.stdin, stdout=sys.stdout)
 
 
 if __name__ == "__main__":
