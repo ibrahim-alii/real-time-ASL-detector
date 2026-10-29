@@ -1,18 +1,34 @@
-"""Validated examples and padded batches for the current T5 experiment."""
+"""Validated landmark examples and padded batches."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from torch import Tensor
 
 from .cache import TranslationFeatureCache
+from .contracts import TranslationRequest
 from .features import TRANSLATION_FEATURE_SCHEMA
 from .manifest import ClipManifest, read_manifest
-from .model import encoded_values
 from .schema import MMPOSE_SCHEMA, translation_schema
+
+
+def encoded_values(request: TranslationRequest, encoding: str) -> torch.Tensor:
+    values = request.values.copy()
+    if encoding == "mask-v1":
+        schema = translation_schema(request.feature_schema)
+        coordinates = values.reshape(len(values), schema.landmarks, -1)
+        coordinates[~request.landmark_mask] = 0
+        values = np.concatenate(
+            (coordinates.reshape(len(values), -1), request.landmark_mask.astype(np.float32)), axis=1
+        )
+    elif encoding != "sentinel-v1":
+        raise ValueError("unsupported translation input encoding")
+    return torch.from_numpy(values)
+
 
 
 def _examples(
