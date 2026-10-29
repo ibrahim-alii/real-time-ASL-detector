@@ -155,32 +155,24 @@ def test_translation_returns_display_data_and_cleans_session(
     monkeypatch.setattr(
         workspace.subprocess, "run", lambda command, **_: transcodes.append(command)
     )
-    commands: list[list[str]] = []
+    warm = MagicMock()
 
-    def start(command: list[str], **_: object) -> MagicMock:
-        commands.append(command)
-        result = {"english": "Synthetic result", "model_id": "fixture", "model_version": "v1",
-                  "latency_ms": 2, "quality_status": "unverified", "video": "private-path"}
-        Path(command[command.index("--output") + 1]).write_text(json.dumps(result))
-        sidecar = Path(command[command.index("--overlay") + 1]).with_suffix(".json")
-        sidecar.write_text(json.dumps({"width": 32, "height": 24, "frames": [],
-                                      "source": "private-path"}))
-        process = MagicMock()
-        process.__enter__.return_value = process
-        process.wait.return_value = 0
-        return process
+    def infer(root: Path, video: Path, overlay: Path) -> dict[str, object]:
+        overlay.with_suffix(".json").write_text(json.dumps({
+            "width": 32, "height": 24, "frames": [], "source": "private-path"
+        }))
+        return {"english": "Synthetic result", "model_id": "fixture", "model_version": "v1",
+                "checkpoint_sha256": "a" * 64, "quality_status": "unverified",
+                "timings": {"warm_workers": True}}
 
-    monkeypatch.setattr(workspace.subprocess, "Popen", start)
+    warm.infer.side_effect = infer
     with tempfile.TemporaryDirectory() as temporary:
-        keys = ("python", "extraction_python", "checkpoint", *workspace.ASSET_NAMES)
-        config = dict.fromkeys(keys, "synthetic-path")
-        config["work_root"] = temporary
-        result = workspace.translate_clip(b"synthetic", config)
+        config = {"work_root": temporary, "model": "shubert"}
+        result = workspace.translate_clip(b"synthetic", config, warm)
         assert result["english"] == "Synthetic result"
         assert "private-path" not in json.dumps(result)
         assert not list(Path(temporary).iterdir())
-        assert "--extraction-python" in commands[0]
-        assert commands[0][-1] == "synthetic-path"
+        assert warm.infer.call_count == 1
         filters = transcodes[0][transcodes[0].index("-vf") + 1]
         assert filters == "scale=640:480:force_original_aspect_ratio=decrease:force_divisible_by=2"
         assert transcodes[0][transcodes[0].index("-pix_fmt") + 1] == "yuv420p"
