@@ -20,8 +20,8 @@ import torch
 
 from asl_recognizer.translation import acquisition, sol
 from asl_recognizer.translation.contracts import TranslationRequest
-from asl_recognizer.translation.model import encoded_values
 from asl_recognizer.translation.sol_common import capacity, read_json, write_json
+from asl_recognizer.translation.training import encoded_values
 
 
 def test_sol_runtime_checks_extractor_without_legacy_training(tmp_path):
