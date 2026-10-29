@@ -16,5 +16,6 @@ def test_worker_retires_legacy_gpu_check():
     from asl_recognizer.translation import worker
 
     commands = worker._parser()._subparsers._group_actions[0].choices
-    assert "check-training-gpu" not in commands
+    retired = {"check-training-gpu", "train-local", "finalize", "infer-video", "evaluate"}
+    assert not retired & commands.keys()
     assert "runtime-check" in commands
