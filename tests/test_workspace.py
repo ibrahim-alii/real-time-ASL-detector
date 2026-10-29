@@ -100,6 +100,24 @@ def test_inference_boundaries_and_single_writer(server: Any, workspace: ModuleTy
     server.inference_lock.release()
 
 
+def test_wrong_content_type_drains_bounded_body(workspace: ModuleType) -> None:
+    from io import BytesIO
+    from types import SimpleNamespace
+
+    handler = object.__new__(workspace.WorkspaceHandler)
+    handler.connection = MagicMock()
+    handler.server = SimpleNamespace(runtime={"synthetic": True})
+    handler.trusted = lambda: True
+    handler.path = "/api/translate"
+    handler.headers = {"X-ASL-Request": "clip", "Content-Length": "4",
+                       "Content-Type": "application/json"}
+    handler.rfile = BytesIO(b"test")
+    handler.reply = MagicMock()
+    handler.do_POST()
+    assert handler.rfile.tell() == 4
+    assert handler.reply.call_args.args[0] == 400
+
+
 def test_backend_failures_release_writer(server: Any, workspace: ModuleType,
                                          monkeypatch: pytest.MonkeyPatch) -> None:
     server.runtime = {"synthetic": True}
