@@ -117,29 +117,13 @@ def _parser() -> argparse.ArgumentParser:
     mmpose_people.add_argument("--video-root", type=Path, required=True)
     mmpose_people.add_argument("--output", type=Path, required=True)
     mmpose_people.add_argument("--resume-root", type=Path)
-    for name in ("extract-video", "infer-video"):
-        recorded = commands.add_parser(name)
-        _pose_arguments(recorded)
-        recorded.add_argument("--video", type=Path, required=True)
-        recorded.add_argument("--output", type=Path, required=True)
-        recorded.add_argument("--start-ms", type=int, default=0)
-        recorded.add_argument("--end-ms", type=int)
-        recorded.add_argument("--overlay", type=Path)
-        if name == "infer-video":
-            recorded.add_argument("--checkpoint", type=Path, required=True)
-            recorded.add_argument("--extraction-python", type=Path)
-    local = commands.add_parser("train-local")
-    local.add_argument("--features", type=Path, required=True)
-    local.add_argument("--how2sign-manifest", type=Path, required=True)
-    local.add_argument("--youtube-manifest", type=Path)
-    local.add_argument("--output", type=Path, required=True)
-    local.add_argument("--config", type=Path, default=Path("config/local_translation.json"))
-    local.add_argument("--wall-time-seconds", type=float)
-    local.add_argument("--job-steps", type=int)
-    local.add_argument("--device")
-    finalize = commands.add_parser("finalize")
-    finalize.add_argument("--run", type=Path, required=True)
-    finalize.add_argument("--output", type=Path, required=True)
+    recorded = commands.add_parser("extract-video")
+    _pose_arguments(recorded)
+    recorded.add_argument("--video", type=Path, required=True)
+    recorded.add_argument("--output", type=Path, required=True)
+    recorded.add_argument("--start-ms", type=int, default=0)
+    recorded.add_argument("--end-ms", type=int)
+    recorded.add_argument("--overlay", type=Path)
     estimate = commands.add_parser("estimate-local")
     estimate.add_argument("--progress", type=Path, required=True)
     estimate.add_argument("--extraction-report", type=Path, required=True)
@@ -184,16 +168,6 @@ def _parser() -> argparse.ArgumentParser:
     extract.add_argument("--splits", nargs="+", choices=("train", "dev", "test"))
     extract.add_argument("--shard-count", type=int, required=True)
     extract.add_argument("--shard-index", type=int, required=True)
-    evaluate = commands.add_parser("evaluate")
-    evaluate.add_argument("--checkpoint", type=Path, required=True)
-    evaluate.add_argument("--manifest", type=Path, required=True)
-    evaluate.add_argument("--features", type=Path, required=True)
-    evaluate.add_argument("--output", type=Path, required=True)
-    evaluate.add_argument("--split", choices=("dev", "test"), required=True)
-    evaluate.add_argument("--beam-width", type=int, default=5)
-    evaluate.add_argument("--sacrebleu-version", default="2")
-    evaluate.add_argument("--bleurt-checkpoint", default="BLEURT-20")
-    evaluate.add_argument("--metrics", choices=("basic", "paper"), default="paper")
     return parser
 
 
@@ -246,25 +220,11 @@ def _local_command(args: argparse.Namespace) -> int | None:
             writer.writeheader()
             writer.writerows(annotated)
         write_json(args.output.with_suffix(".json"), {"extractor": identity, "outcomes": counts})
-    elif args.command in {"extract-video", "infer-video"}:
-        from .recorded import extract_video, infer_video
-        kwargs = dict(video=args.video, assets=_assets(args), output=args.output,
+    elif args.command == "extract-video":
+        from .recorded import extract_video
+        extract_video(video=args.video, assets=_assets(args), output=args.output,
                       device=args.device, start_ms=args.start_ms, end_ms=args.end_ms,
-                      overlay=args.overlay)
-        if args.command == "extract-video":
-            extract_video(**kwargs, threshold=args.keypoint_threshold)
-        else:
-            infer_video(**kwargs, checkpoint=args.checkpoint,
-                        extraction_python=args.extraction_python)
-    elif args.command == "train-local":
-        from .experiment import ExperimentConfig, run_experiment
-        run_experiment(features=args.features, how2sign_manifest=args.how2sign_manifest,
-                       youtube_manifest=args.youtube_manifest, output=args.output,
-                       config=ExperimentConfig.read(args.config), job_steps=args.job_steps,
-                       device_name=args.device, wall_time_seconds=args.wall_time_seconds)
-    elif args.command == "finalize":
-        from .experiment import finalize_experiment
-        finalize_experiment(args.run, args.output)
+                      overlay=args.overlay, threshold=args.keypoint_threshold)
     elif args.command == "estimate-local":
         from .resources import resource_estimate
         write_json(args.output, resource_estimate(
@@ -422,23 +382,7 @@ def main(argv: list[str] | None = None) -> int:
             encoding="utf-8",
         )
         return 0
-    if (
-        args.beam_width != 5
-        or args.sacrebleu_version != "2"
-        or args.bleurt_checkpoint != "BLEURT-20"
-    ):
-        raise ValueError("paper evaluation requires beam 5, SacreBLEU v2, and BLEURT-20")
-    from .evaluation import evaluate_checkpoint
-
-    evaluate_checkpoint(
-        checkpoint=args.checkpoint,
-        manifest_path=args.manifest,
-        features=args.features,
-        output=args.output,
-        split=args.split,
-        with_bleurt=args.metrics == "paper",
-    )
-    return 0
+    raise ValueError("unsupported command")
 
 
 if __name__ == "__main__":
