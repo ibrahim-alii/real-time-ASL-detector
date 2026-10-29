@@ -22,7 +22,6 @@ from .cache import TranslationFeatureCache
 from .contracts import DirectTranslationResult, TranslationRequest
 from .features import mmpose_translation_request
 from .local_runtime import OverlayWriter, extractor_identity
-from .model import LandmarkT5
 from .pose_cache import PREPROCESSING, PoseCache, pose_quality
 from .schema import MMPOSE_SCHEMA
 from .sol_common import write_json
@@ -122,6 +121,7 @@ class TranslationEngine:
         from transformers import AutoTokenizer
 
         from .experiment import checkpoint_model_config
+        from .model import LandmarkT5
 
         started = time.perf_counter()
         self.checkpoint_sha256 = file_hash(checkpoint)
