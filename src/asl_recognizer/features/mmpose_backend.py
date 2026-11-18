@@ -64,7 +64,7 @@ class MMPoseWholeBodyBackend:
         except ImportError as error:
             raise RuntimeError(
                 "MMPose extraction needs a compatible MMPose/MMCV/MMDetection environment; "
-                "see docs/MMPOSE_DATA_GUIDE.md"
+                "see requirements/mmpose-local.txt"
             ) from error
         detector: Any = init_detector(str(detector_config), str(detector_weights), device=device)
         detector.cfg = adapt_mmdet_pipeline(detector.cfg)

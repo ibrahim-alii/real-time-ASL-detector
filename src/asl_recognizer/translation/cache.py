@@ -76,7 +76,7 @@ class TranslationFeatureCache:
             return (TranslationRequest(request.values.copy(), request.landmark_mask.copy(),
                                        request.feature_schema), deepcopy(cached[2]))
         self._forget(clip_id)
-        expected = self._digest_path(clip_id).read_text(encoding="ascii").strip()
+        expected = digest_path.read_text(encoding="ascii").strip()
         if expected != file_hash(path):
             raise ValueError("feature shard checksum mismatch")
         with np.load(path, allow_pickle=False) as archive:

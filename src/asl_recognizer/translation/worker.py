@@ -199,7 +199,7 @@ def _local_command(args: argparse.Namespace) -> int | None:
         write_json(args.output, runtime_check(_assets(args), device=args.device,
                                               threshold=args.keypoint_threshold))
     elif args.command == "validate-people-mmpose":
-        from .person_validation import EVIDENCE_FIELDS, annotate_caption_rows
+        from .person_validation import EVIDENCE_FIELDS, VALIDATOR_NAME, annotate_caption_rows
         if args.output.exists():
             raise FileExistsError(args.output)
         with args.input.open(newline="", encoding="utf-8-sig") as handle:
@@ -210,7 +210,7 @@ def _local_command(args: argparse.Namespace) -> int | None:
             annotated, counts = annotate_caption_rows(
                 rows, video_root=args.video_root,
                 model_sha256=str(identity["assets"]["detector_weights"]),
-                detect_people=detector.count_people, validator_name="mmpose-person-1hz-v1",
+                detect_people=detector.count_people, validator_name=VALIDATOR_NAME,
                 resume_root=args.resume_root)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("w", newline="", encoding="utf-8") as handle:

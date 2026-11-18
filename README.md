@@ -82,8 +82,9 @@ Older LandmarkT5 workspace configurations must be replaced with a supported mode
 The server environment needs OpenCV and `ffmpeg` with H.264 support. Use this updated source on Sol;
 the extractor and checkpoint identities must match. Forward local port 8765 to the allocated node's
 loopback port 8765 through your configured SSH jump host, then open the local URL above.
-The server is loopback-only. Match local and remote port numbers; uploads are capped at 16 MiB,
-processing at ten minutes. Session media and caches are removed after processing.
+The server is loopback-only. Match local and remote port numbers; uploads are capped at 16 MiB
+and each worker request times out after five minutes. Session media and caches are removed after
+processing.
 
 Run synthetic workspace checks with `python -m pytest tests/test_workspace.py -q`.
 The JavaScript contract check uses Node when available. These tests need no camera, dataset or weights.

@@ -1,4 +1,4 @@
-"""Validated landmark examples and padded batches."""
+"""Validated landmark examples and encoded model inputs."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import torch
-from torch import Tensor
 
 from .cache import TranslationFeatureCache
 from .contracts import TranslationRequest
@@ -62,35 +61,3 @@ def _examples(
     if not examples:
         raise ValueError(f"no accepted {source} training examples")
     return manifest, examples, extractor_identity
-
-
-def _batch(
-    selected: list[tuple[str, str]],
-    cache: TranslationFeatureCache,
-    tokenizer: Any,
-    device: torch.device,
-    input_encoding: str = "sentinel-v1",
-) -> tuple[Tensor, Tensor, Tensor]:
-    requests = [cache.load(clip_id)[0] for clip_id, _ in selected]
-    schemas = {request.feature_schema for request in requests}
-    if len(schemas) != 1:
-        raise ValueError("training batch cannot mix landmark schemas")
-    dimension = translation_schema(requests[0].feature_schema).dimension
-    if input_encoding == "mask-v1":
-        dimension += translation_schema(requests[0].feature_schema).landmarks
-    length = max(len(item.values) for item in requests)
-    values = torch.zeros((len(requests), length, dimension), dtype=torch.float32)
-    attention = torch.zeros((len(requests), length), dtype=torch.long)
-    for index, request in enumerate(requests):
-        size = len(request.values)
-        values[index, :size] = encoded_values(request, input_encoding)
-        attention[index, :size] = 1
-    tokens = tokenizer(
-        [caption for _, caption in selected],
-        padding=True,
-        truncation=True,
-        max_length=128,
-        return_tensors="pt",
-    )["input_ids"]
-    labels = tokens.masked_fill(tokens == tokenizer.pad_token_id, -100)
-    return values.to(device), attention.to(device), labels.to(device)

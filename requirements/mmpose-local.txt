@@ -1,4 +1,4 @@
-# Python 3.11; install Torch and MMCV wheels first (see local guide).
+# Python 3.11; install Torch and MMCV wheels first (see hpc/sol-bootstrap.sh).
 setuptools==75.8.0
 wheel==0.45.1
 numpy==1.26.4
