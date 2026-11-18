@@ -39,7 +39,7 @@ def git(*args: str) -> bytes:
 def path_problem(path: str, *, historical: bool = False) -> str | None:
     name = PurePosixPath(path)
     parts = [p.casefold() for p in name.parts]
-    if path == 'README.md' or (historical and path == 'LICENSE.md'):
+    if path in {'README.md', 'AGENTS.md'} or (historical and path == 'LICENSE.md'):
         return None
     if parts[0] in PRIVATE_ROOTS or any(
         p in PRIVATE_PARTS or p.startswith(('.test-tmp-', '.codex-test-')) for p in parts

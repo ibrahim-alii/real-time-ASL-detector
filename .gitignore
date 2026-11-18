@@ -80,6 +80,7 @@ docs/
 *.docx
 *.pptx
 !/README.md
+!/AGENTS.md
 
 # Machine/cluster credentials and personalized configuration
 .codex/

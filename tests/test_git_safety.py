@@ -20,7 +20,7 @@ def load_guard():  # type: ignore[no-untyped-def]
 
 
 @pytest.mark.parametrize('path', [
-    'PRD.md', 'docs/plan.txt', 'sub/README.md', '.env', '.aws/config',
+    'PRD.md', 'docs/plan.txt', 'sub/README.md', 'sub/AGENTS.md', '.env', '.aws/config',
     '.asl-sol-access/known_hosts', 'config/sol_translation.json', 'youtube-cookies.txt',
     'models/model.pt', 'data/raw.json', 'artifacts/report.json', '.codex/state.json',
     'reports/audit.json', 'plans/next.txt',
@@ -30,7 +30,7 @@ def test_protected_paths_rejected(path: str) -> None:
 
 
 @pytest.mark.parametrize('path', [
-    'README.md', 'LICENSE', 'src/asl_recognizer/models/model.py',
+    'README.md', 'AGENTS.md', 'LICENSE', 'src/asl_recognizer/models/model.py',
     'src/asl_recognizer/data/index.py', 'config/sol_translation.example.json',
 ])
 def test_public_source_and_license_allowed(path: str) -> None:
